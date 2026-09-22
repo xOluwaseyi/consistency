@@ -131,3 +131,21 @@ export async function getSessionDurationsForTasks(taskIds: string[]) {
   }
   return totals;
 }
+
+export async function getSubtaskCountsForTasks(taskIds: string[]) {
+  if (taskIds.length === 0) return new Map<string, { total: number; completed: number }>();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("subtasks")
+    .select("task_id, completed")
+    .in("task_id", taskIds);
+
+  const counts = new Map<string, { total: number; completed: number }>();
+  for (const row of data ?? []) {
+    const entry = counts.get(row.task_id) ?? { total: 0, completed: 0 };
+    entry.total += 1;
+    if (row.completed) entry.completed += 1;
+    counts.set(row.task_id, entry);
+  }
+  return counts;
+}

@@ -12,7 +12,7 @@ async function requireUser() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+  if (!user) redirect("/login");
   return { supabase, user };
 }
 
@@ -101,29 +101,52 @@ export async function deleteTask(taskId: string) {
   revalidatePath("/week");
 }
 
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+
+async function assertCanComplete(supabase: SupabaseServerClient, taskId: string) {
+  const { data: task } = await supabase
+    .from("tasks")
+    .select("track_time")
+    .eq("id", taskId)
+    .single();
+
+  if (task?.track_time) {
+    const { count } = await supabase
+      .from("task_sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("task_id", taskId)
+      .not("ended_at", "is", null);
+
+    if (!count) {
+      throw new Error(
+        "This task needs at least one logged timer session before it can be marked done.",
+      );
+    }
+  }
+
+  const { count: subtaskTotal } = await supabase
+    .from("subtasks")
+    .select("id", { count: "exact", head: true })
+    .eq("task_id", taskId);
+
+  if (subtaskTotal) {
+    const { count: subtaskDone } = await supabase
+      .from("subtasks")
+      .select("id", { count: "exact", head: true })
+      .eq("task_id", taskId)
+      .eq("completed", true);
+
+    if (subtaskDone !== subtaskTotal) {
+      throw new Error("Finish all subtasks before marking this task done.");
+    }
+  }
+}
+
 export async function toggleTaskComplete(taskId: string, completed: boolean) {
   const { supabase, user } = await requireUser();
 
   if (completed) {
-    const { data: task } = await supabase
-      .from("tasks")
-      .select("track_time")
-      .eq("id", taskId)
-      .single();
-
-    if (task?.track_time) {
-      const { count } = await supabase
-        .from("task_sessions")
-        .select("id", { count: "exact", head: true })
-        .eq("task_id", taskId)
-        .not("ended_at", "is", null);
-
-      if (!count) {
-        throw new Error(
-          "This task needs at least one logged timer session before it can be marked done.",
-        );
-      }
-    }
+    await assertCanComplete(supabase, taskId);
   }
 
   const { error } = await supabase
@@ -176,6 +199,101 @@ export async function stopTimerSession(sessionId: string) {
   if (error) throw new Error(error.message);
   revalidatePath("/today");
   revalidatePath("/overview");
+}
+
+export async function getTaskDetail(taskId: string) {
+  const { supabase } = await requireUser();
+
+  const [{ data: subtasks }, { data: sessions }] = await Promise.all([
+    supabase
+      .from("subtasks")
+      .select("*")
+      .eq("task_id", taskId)
+      .order("position", { ascending: true })
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("task_sessions")
+      .select("*")
+      .eq("task_id", taskId)
+      .order("started_at", { ascending: false }),
+  ]);
+
+  return { subtasks: subtasks ?? [], sessions: sessions ?? [] };
+}
+
+export async function createSubtask(taskId: string, title: string) {
+  const { supabase, user } = await requireUser();
+
+  const { count } = await supabase
+    .from("subtasks")
+    .select("id", { count: "exact", head: true })
+    .eq("task_id", taskId);
+
+  const { error } = await supabase.from("subtasks").insert({
+    task_id: taskId,
+    user_id: user.id,
+    title: title.trim(),
+    position: count ?? 0,
+  });
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/today");
+  revalidatePath("/week");
+}
+
+/**
+ * Toggling a subtask complete auto-completes the parent task once every
+ * subtask is done (respecting the same track-time gate as a manual
+ * complete). Un-checking a subtask never un-completes the parent — you can
+ * still do that yourself from the task if you want to.
+ */
+export async function toggleSubtask(subtaskId: string, completed: boolean) {
+  const { supabase } = await requireUser();
+
+  const { data: subtask, error } = await supabase
+    .from("subtasks")
+    .update({ completed })
+    .eq("id", subtaskId)
+    .select("task_id")
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  if (completed) {
+    const { count: total } = await supabase
+      .from("subtasks")
+      .select("id", { count: "exact", head: true })
+      .eq("task_id", subtask.task_id);
+    const { count: done } = await supabase
+      .from("subtasks")
+      .select("id", { count: "exact", head: true })
+      .eq("task_id", subtask.task_id)
+      .eq("completed", true);
+
+    if (total && total === done) {
+      try {
+        await assertCanComplete(supabase, subtask.task_id);
+        await supabase
+          .from("tasks")
+          .update({ completed: true, completed_at: new Date().toISOString() })
+          .eq("id", subtask.task_id);
+      } catch {
+        // track-time requirement not met yet — leave the task unchecked
+      }
+    }
+  }
+
+  revalidatePath("/today");
+  revalidatePath("/week");
+  revalidatePath("/overview");
+}
+
+export async function deleteSubtask(subtaskId: string) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.from("subtasks").delete().eq("id", subtaskId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/today");
+  revalidatePath("/week");
 }
 
 export async function applyStreakFreeze(date: string) {

@@ -1,4 +1,10 @@
-import { getTasksForDate, getStreakContext, getOpenSessionsForTasks, getSessionDurationsForTasks } from "@/lib/data";
+import {
+  getTasksForDate,
+  getStreakContext,
+  getOpenSessionsForTasks,
+  getSessionDurationsForTasks,
+  getSubtaskCountsForTasks,
+} from "@/lib/data";
 import { todayKey } from "@/lib/streak";
 import { StreakBanner } from "@/components/StreakBanner";
 import { TaskCard } from "@/components/TaskCard";
@@ -13,9 +19,10 @@ export default async function TodayPage() {
   const today = todayKey();
   const [tasks, streakCtx] = await Promise.all([getTasksForDate(today), getStreakContext()]);
   const taskIds = tasks.map((t) => t.id);
-  const [openSessions, durations] = await Promise.all([
+  const [openSessions, durations, subtaskCounts] = await Promise.all([
     getOpenSessionsForTasks(taskIds),
     getSessionDurationsForTasks(taskIds),
+    getSubtaskCountsForTasks(taskIds),
   ]);
 
   const openByTask = new Map(openSessions.map((s) => [s.task_id, s]));
@@ -70,6 +77,7 @@ export default async function TodayPage() {
             task={task}
             openSession={openByTask.get(task.id) ? { id: openByTask.get(task.id)!.id, started_at: openByTask.get(task.id)!.started_at } : null}
             totalSeconds={durations.get(task.id) ?? 0}
+            subtaskCounts={subtaskCounts.get(task.id)}
           />
         ))}
       </div>

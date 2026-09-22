@@ -77,6 +77,18 @@ create table if not exists push_subscriptions (
   created_at timestamptz not null default now()
 );
 
+create table if not exists subtasks (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid not null references tasks (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  title text not null,
+  completed boolean not null default false,
+  position integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists subtasks_task_idx on subtasks (task_id);
+
 -- Row Level Security: every table is scoped to auth.uid().
 alter table profiles enable row level security;
 alter table tasks enable row level security;
@@ -85,6 +97,7 @@ alter table streak_freezes enable row level security;
 alter table distractions enable row level security;
 alter table reflections enable row level security;
 alter table push_subscriptions enable row level security;
+alter table subtasks enable row level security;
 
 create policy "own profile" on profiles for all using (auth.uid() = id) with check (auth.uid() = id);
 create policy "own tasks" on tasks for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
@@ -93,13 +106,14 @@ create policy "own freezes" on streak_freezes for all using (auth.uid() = user_i
 create policy "own distractions" on distractions for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own reflections" on reflections for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own push subs" on push_subscriptions for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own subtasks" on subtasks for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- Table-level grants for the Data API (PostgREST). Needed if your project has
 -- "Automatically expose new tables" turned off — RLS above still restricts
 -- every row to its owner regardless of these grants.
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on
-  profiles, tasks, task_sessions, streak_freezes, distractions, reflections, push_subscriptions
+  profiles, tasks, task_sessions, streak_freezes, distractions, reflections, push_subscriptions, subtasks
   to authenticated;
 
 -- Auto-create a profile row whenever a new auth user signs up.

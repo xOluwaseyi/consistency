@@ -1,4 +1,9 @@
-import { getTasksForRange, getSessionDurationsForTasks, getOpenSessionsForTasks } from "@/lib/data";
+import {
+  getTasksForRange,
+  getSessionDurationsForTasks,
+  getOpenSessionsForTasks,
+  getSubtaskCountsForTasks,
+} from "@/lib/data";
 import { getWeekDays, formatWeekRange, toDateKey } from "@/lib/date";
 import { todayKey } from "@/lib/streak";
 import { WeekNav } from "@/components/WeekNav";
@@ -22,9 +27,10 @@ export default async function WeekPage({
   const endKey = toDateKey(days[6]);
   const tasks = await getTasksForRange(startKey, endKey);
   const taskIds = tasks.map((t) => t.id);
-  const [openSessions, durations] = await Promise.all([
+  const [openSessions, durations, subtaskCounts] = await Promise.all([
     getOpenSessionsForTasks(taskIds),
     getSessionDurationsForTasks(taskIds),
+    getSubtaskCountsForTasks(taskIds),
   ]);
   const openByTask = new Map(openSessions.map((s) => [s.task_id, s]));
 
@@ -92,6 +98,7 @@ export default async function WeekPage({
                         : null
                     }
                     totalSeconds={durations.get(task.id) ?? 0}
+                    subtaskCounts={subtaskCounts.get(task.id)}
                   />
                 ))}
                 <NewTaskForm scheduledDate={key} />

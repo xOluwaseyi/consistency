@@ -118,6 +118,23 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["push_subscriptions"]["Row"]>;
       } & NoRelationships;
+      subtasks: {
+        Row: {
+          id: string;
+          task_id: string;
+          user_id: string;
+          title: string;
+          completed: boolean;
+          position: number;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["subtasks"]["Row"]> & {
+          task_id: string;
+          user_id: string;
+          title: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["subtasks"]["Row"]>;
+      } & NoRelationships;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -129,3 +146,4 @@ export type TaskSession = Database["public"]["Tables"]["task_sessions"]["Row"];
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Reflection = Database["public"]["Tables"]["reflections"]["Row"];
 export type Distraction = Database["public"]["Tables"]["distractions"]["Row"];
+export type Subtask = Database["public"]["Tables"]["subtasks"]["Row"];
