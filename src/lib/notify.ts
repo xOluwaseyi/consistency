@@ -13,10 +13,18 @@ export async function notifyUser(
   payload: { title: string; body: string; url?: string },
 ): Promise<NotifyResult> {
   const supabase = createAdminClient();
-  const { data: subs } = await supabase
+  const { data: subs, error: queryError } = await supabase
     .from("push_subscriptions")
     .select("id, endpoint, p256dh, auth")
     .eq("user_id", userId);
+
+  if (queryError) {
+    console.error("Failed to look up push subscriptions (check SUPABASE_SERVICE_ROLE_KEY)", queryError);
+    return {
+      sent: 0,
+      failed: [{ reason: `Couldn't look up subscriptions: ${queryError.message}` }],
+    };
+  }
 
   if (!subs || subs.length === 0) {
     return { sent: 0, failed: [{ reason: "No push subscription saved for this account." }] };
