@@ -31,6 +31,9 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
+  --color-priority-low: var(--priority-low);
+  --color-priority-medium: var(--priority-medium);
+  --color-priority-high: var(--priority-high);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

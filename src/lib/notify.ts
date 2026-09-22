@@ -2,31 +2,51 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushNotification } from "@/lib/push-server";
 import { computeStreakContext } from "@/lib/streak";
 
+export interface NotifyResult {
+  sent: number;
+  failed: { reason: string }[];
+}
+
 /** Sends to every push subscription for a user, pruning ones the push service rejects as gone. */
 export async function notifyUser(
   userId: string,
   payload: { title: string; body: string; url?: string },
-) {
+): Promise<NotifyResult> {
   const supabase = createAdminClient();
   const { data: subs } = await supabase
     .from("push_subscriptions")
     .select("id, endpoint, p256dh, auth")
     .eq("user_id", userId);
 
-  if (!subs || subs.length === 0) return;
+  if (!subs || subs.length === 0) {
+    return { sent: 0, failed: [{ reason: "No push subscription saved for this account." }] };
+  }
 
-  await Promise.all(
+  const results = await Promise.all(
     subs.map(async (sub) => {
       try {
         await sendPushNotification(sub, payload);
+        return { ok: true as const };
       } catch (err: unknown) {
         const statusCode = (err as { statusCode?: number })?.statusCode;
+        const body = (err as { body?: string })?.body;
         if (statusCode === 404 || statusCode === 410) {
           await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+          return { ok: false as const, reason: "Subscription expired and was removed. Try enabling notifications again." };
         }
+        console.error("Push send failed", { statusCode, body });
+        return {
+          ok: false as const,
+          reason: `Push service rejected the notification${statusCode ? ` (${statusCode})` : ""}${body ? `: ${body}` : ""}.`,
+        };
       }
     }),
   );
+
+  return {
+    sent: results.filter((r) => r.ok).length,
+    failed: results.filter((r): r is { ok: false; reason: string } => !r.ok),
+  };
 }
 
 export function todayInTimezone(timezone: string): string {

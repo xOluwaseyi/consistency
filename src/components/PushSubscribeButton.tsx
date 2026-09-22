@@ -1,26 +1,36 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BellRing, BellOff, Send } from "lucide-react";
+import { BellRing, BellOff, Send, TriangleAlert } from "lucide-react";
 import { enablePushNotifications, getPushSubscriptionState } from "@/lib/push-client";
 
 export function PushSubscribeButton() {
   const [state, setState] = useState<"granted" | "denied" | "default">("default");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resyncing, setResyncing] = useState(false);
   const [testStatus, setTestStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [testError, setTestError] = useState<string | null>(null);
+
+  async function resync() {
+    setResyncing(true);
+    setError(null);
+    const result = await enablePushNotifications();
+    setResyncing(false);
+    if (!result.ok) {
+      setError(result.reason ?? "Couldn't verify the subscription.");
+    }
+  }
 
   useEffect(() => {
     getPushSubscriptionState().then((permission) => {
       setState(permission);
       // Browser permission being "granted" doesn't guarantee the subscription
       // was ever actually saved server-side (e.g. if that save failed on an
-      // earlier attempt). Re-run it silently — requestPermission() resolves
-      // immediately with no prompt when already granted, so this is safe.
-      if (permission === "granted") {
-        enablePushNotifications();
-      }
+      // earlier attempt). Re-verify it — requestPermission() resolves
+      // immediately with no prompt when already granted, so this is safe —
+      // and surface it if it fails instead of failing silently.
+      if (permission === "granted") resync();
     });
   }, []);
 
@@ -52,6 +62,25 @@ export function PushSubscribeButton() {
   }
 
   if (state === "granted") {
+    if (error) {
+      return (
+        <div className="space-y-2">
+          <div className="flex items-start gap-2 rounded-xl bg-danger/10 px-3.5 py-2.5 text-sm text-danger">
+            <TriangleAlert size={15} className="mt-0.5 shrink-0" />
+            <span>Permission is granted, but the subscription couldn&rsquo;t be saved: {error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={resync}
+            disabled={resyncing}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border px-3.5 py-2 text-xs font-medium text-muted transition hover:text-foreground disabled:opacity-50"
+          >
+            {resyncing ? "Retrying…" : "Retry"}
+          </button>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-2 rounded-xl bg-success/10 px-3.5 py-2.5 text-sm text-success">
@@ -60,7 +89,7 @@ export function PushSubscribeButton() {
         <button
           type="button"
           onClick={handleTest}
-          disabled={testStatus === "sending"}
+          disabled={testStatus === "sending" || resyncing}
           className="flex w-full items-center justify-center gap-2 rounded-xl border border-border px-3.5 py-2 text-xs font-medium text-muted transition hover:text-foreground disabled:opacity-50"
         >
           <Send size={13} />

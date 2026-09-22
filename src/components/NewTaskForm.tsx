@@ -17,7 +17,6 @@ export function NewTaskForm({ scheduledDate }: { scheduledDate: string }) {
   const [title, setTitle] = useState("");
   const [why, setWhy] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("medium");
-  const [trackTime, setTrackTime] = useState(false);
   const [repeatDaily, setRepeatDaily] = useState(false);
   const [pending, startTransition] = useTransition();
   const titleRef = useRef<HTMLInputElement>(null);
@@ -26,7 +25,6 @@ export function NewTaskForm({ scheduledDate }: { scheduledDate: string }) {
     setTitle("");
     setWhy("");
     setPriority("medium");
-    setTrackTime(false);
     setRepeatDaily(false);
     setOpen(false);
   }
@@ -35,7 +33,7 @@ export function NewTaskForm({ scheduledDate }: { scheduledDate: string }) {
     e.preventDefault();
     if (!title.trim()) return;
     startTransition(async () => {
-      await createTask({ title, why, priority, trackTime, repeatDaily, scheduledDate });
+      await createTask({ title, why, priority, repeatDaily, scheduledDate });
       reset();
     });
   }
@@ -85,47 +83,34 @@ export function NewTaskForm({ scheduledDate }: { scheduledDate: string }) {
         className="w-full rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs outline-none focus:border-accent"
       />
 
-      <div className="flex items-center justify-between">
-        <div className="flex gap-1.5">
-          {PRIORITIES.map((p) => (
-            <button
-              key={p.value}
-              type="button"
-              onClick={() => setPriority(p.value)}
-              className={cn(
-                "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition",
-                priority === p.value
-                  ? "border-accent bg-accent-soft/40 text-foreground"
-                  : "border-border text-muted",
-              )}
-            >
-              <span className={cn("h-1.5 w-1.5 rounded-full", p.dot)} />
-              {p.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-[11px] text-muted">
-            <input
-              type="checkbox"
-              checked={trackTime}
-              onChange={(e) => setTrackTime(e.target.checked)}
-              className="h-3.5 w-3.5 rounded accent-accent"
-            />
-            Track time
-          </label>
-          <label className="flex items-center gap-1.5 text-[11px] text-muted">
-            <input
-              type="checkbox"
-              checked={repeatDaily}
-              onChange={(e) => setRepeatDaily(e.target.checked)}
-              className="h-3.5 w-3.5 rounded accent-accent"
-            />
-            <Repeat size={11} /> Repeat daily
-          </label>
-        </div>
+      <div className="flex flex-wrap gap-1.5">
+        {PRIORITIES.map((p) => (
+          <button
+            key={p.value}
+            type="button"
+            onClick={() => setPriority(p.value)}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition",
+              priority === p.value
+                ? "border-accent bg-accent-soft/40 text-foreground"
+                : "border-border text-muted",
+            )}
+          >
+            <span className={cn("h-1.5 w-1.5 rounded-full", p.dot)} />
+            {p.label}
+          </button>
+        ))}
       </div>
+
+      <label className="flex items-center gap-1.5 text-[11px] text-muted">
+        <input
+          type="checkbox"
+          checked={repeatDaily}
+          onChange={(e) => setRepeatDaily(e.target.checked)}
+          className="h-3.5 w-3.5 rounded accent-accent"
+        />
+        <Repeat size={11} /> Repeat daily
+      </label>
 
       <button
         type="submit"

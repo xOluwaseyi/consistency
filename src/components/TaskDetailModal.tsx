@@ -52,8 +52,7 @@ export function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => 
   }, [openSession]);
 
   const subtasksOk = subtasks.length === 0 || subtasks.every((s) => s.completed);
-  const timeOk = !task.track_time || sessions.some((s) => s.ended_at) || !!openSession;
-  const canComplete = timeOk && subtasksOk;
+  const canComplete = subtasksOk;
 
   async function handleResume() {
     const tempId = `temp-${Date.now()}`;
@@ -101,13 +100,9 @@ export function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => 
         setCompleteError("Finish all subtasks before marking this done.");
         return;
       }
-      // A running timer doesn't count as logged time yet — stop it first so
-      // the session actually has a duration before we try to complete.
+      // Stop the timer as part of completing, so it doesn't keep running.
       if (openSession) {
         await handlePause();
-      } else if (task.track_time && !sessions.some((s) => s.ended_at)) {
-        setCompleteError("Log at least one timer session before marking this done.");
-        return;
       }
     }
 
@@ -140,7 +135,7 @@ export function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => 
     const updated = subtasks.map((s) => (s.id === subtask.id ? { ...s, completed: next } : s));
     setSubtasks(updated);
     await toggleSubtask(subtask.id, next);
-    if (next && updated.every((s) => s.completed) && timeOk) {
+    if (next && updated.every((s) => s.completed)) {
       setCompleted(true);
     }
   }
@@ -213,8 +208,7 @@ export function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => 
           </p>
         )}
 
-        {task.track_time && (
-          <div className="mb-4 flex items-center justify-between rounded-2xl border border-border bg-surface-raised px-4 py-3">
+        <div className="mb-4 flex items-center justify-between rounded-2xl border border-border bg-surface-raised px-4 py-3">
             <div>
               <p className="text-xs text-muted">Time spent</p>
               {loading ? (
@@ -240,7 +234,6 @@ export function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => 
               )}
             </button>
           </div>
-        )}
 
         <div className="mb-4">
           <div className="mb-2 flex items-center justify-between">
@@ -343,9 +336,7 @@ export function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => 
         {!completed && !canComplete && (
           <p className="text-center text-xs text-muted">
             <Lock size={11} className="mr-1 inline" />
-            {!timeOk
-              ? "Log at least one timer session, then tap the checkbox above to complete."
-              : "Finish all subtasks, then tap the checkbox above to complete."}
+            Finish all subtasks, then tap the checkbox above to complete.
           </p>
         )}
       </div>

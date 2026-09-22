@@ -24,11 +24,18 @@ export async function POST() {
     );
   }
 
-  await notifyUser(user.id, {
+  const result = await notifyUser(user.id, {
     title: "Test notification",
     body: "If you can see this, push is working.",
     url: "/today",
   });
+
+  if (result.sent === 0) {
+    return NextResponse.json(
+      { error: result.failed[0]?.reason ?? "Push service rejected the notification." },
+      { status: 502 },
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

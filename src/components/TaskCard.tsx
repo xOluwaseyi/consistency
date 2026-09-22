@@ -33,9 +33,7 @@ export function TaskCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [completed, setCompleted] = useOptimistic(task.completed);
 
-  const timeLogged = totalSeconds > 0 || openSession !== null;
-  const subtasksDone = !subtaskCounts || subtaskCounts.total === 0 || subtaskCounts.completed === subtaskCounts.total;
-  const canComplete = (!task.track_time || timeLogged) && subtasksDone;
+  const canComplete = !subtaskCounts || subtaskCounts.total === 0 || subtaskCounts.completed === subtaskCounts.total;
 
   function handleToggle(e: React.MouseEvent) {
     e.stopPropagation();
@@ -44,9 +42,8 @@ export function TaskCard({
     startTransition(async () => {
       setCompleted(next);
       try {
-        // A running timer doesn't count as logged time yet — stop it first
-        // so the session has an actual duration before we try to complete.
-        if (next && task.track_time && openSession) {
+        // Stop the timer as part of completing, so it doesn't keep running.
+        if (next && openSession) {
           await stopTimerSession(openSession.id);
         }
         await toggleTaskComplete(task.id, next);
@@ -126,11 +123,9 @@ export function TaskCard({
                   {subtaskCounts.completed}/{subtaskCounts.total}
                 </span>
               )}
-              {task.track_time && (
-                <div onClick={(e) => e.stopPropagation()}>
-                  <TimerControl taskId={task.id} openSession={openSession} totalSeconds={totalSeconds} />
-                </div>
-              )}
+              <div onClick={(e) => e.stopPropagation()}>
+                <TimerControl taskId={task.id} openSession={openSession} totalSeconds={totalSeconds} />
+              </div>
             </div>
 
             {showWhy && task.why && (

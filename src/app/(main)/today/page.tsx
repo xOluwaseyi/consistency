@@ -82,8 +82,8 @@ export default async function TodayPage() {
         ))}
       </div>
 
-      <RolloverButton date={today} />
       <NewTaskForm scheduledDate={today} />
+      <RolloverButton date={today} />
       <DistractionButton />
     </div>
   );

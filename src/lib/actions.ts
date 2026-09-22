@@ -20,7 +20,6 @@ export async function createTask(input: {
   title: string;
   why?: string;
   priority: TaskPriority;
-  trackTime: boolean;
   repeatDaily?: boolean;
   scheduledDate: string;
 }) {
@@ -31,7 +30,6 @@ export async function createTask(input: {
     title: input.title.trim(),
     why: input.why?.trim() || null,
     priority: input.priority,
-    track_time: input.trackTime,
     repeat_daily: input.repeatDaily ?? false,
     scheduled_date: input.scheduledDate,
   });
@@ -57,7 +55,7 @@ export async function copyRecurringTasks(targetDate: string): Promise<number> {
   const [{ data: candidates }, { data: existing }] = await Promise.all([
     supabase
       .from("tasks")
-      .select("title, why, priority, track_time, scheduled_date")
+      .select("title, why, priority, scheduled_date")
       .eq("user_id", user.id)
       .eq("repeat_daily", true)
       .lt("scheduled_date", targetDate)
@@ -78,7 +76,6 @@ export async function copyRecurringTasks(targetDate: string): Promise<number> {
       title: t.title,
       why: t.why,
       priority: t.priority,
-      track_time: t.track_time,
       repeat_daily: true,
       scheduled_date: targetDate,
     }));
@@ -104,26 +101,6 @@ export async function deleteTask(taskId: string) {
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 async function assertCanComplete(supabase: SupabaseServerClient, taskId: string) {
-  const { data: task } = await supabase
-    .from("tasks")
-    .select("track_time")
-    .eq("id", taskId)
-    .single();
-
-  if (task?.track_time) {
-    const { count } = await supabase
-      .from("task_sessions")
-      .select("id", { count: "exact", head: true })
-      .eq("task_id", taskId)
-      .not("ended_at", "is", null);
-
-    if (!count) {
-      throw new Error(
-        "This task needs at least one logged timer session before it can be marked done.",
-      );
-    }
-  }
-
   const { count: subtaskTotal } = await supabase
     .from("subtasks")
     .select("id", { count: "exact", head: true })
