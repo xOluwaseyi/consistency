@@ -12,7 +12,16 @@ export function PushSubscribeButton() {
   const [testError, setTestError] = useState<string | null>(null);
 
   useEffect(() => {
-    getPushSubscriptionState().then(setState);
+    getPushSubscriptionState().then((permission) => {
+      setState(permission);
+      // Browser permission being "granted" doesn't guarantee the subscription
+      // was ever actually saved server-side (e.g. if that save failed on an
+      // earlier attempt). Re-run it silently — requestPermission() resolves
+      // immediately with no prompt when already granted, so this is safe.
+      if (permission === "granted") {
+        enablePushNotifications();
+      }
+    });
   }, []);
 
   async function handleEnable() {
