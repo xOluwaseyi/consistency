@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BellRing, BellOff, Send, TriangleAlert } from "lucide-react";
+import { BellRing, BellOff, TriangleAlert } from "lucide-react";
 import { enablePushNotifications, getPushSubscriptionState } from "@/lib/push-client";
 
 export function PushSubscribeButton() {
@@ -9,8 +9,6 @@ export function PushSubscribeButton() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resyncing, setResyncing] = useState(false);
-  const [testStatus, setTestStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [testError, setTestError] = useState<string | null>(null);
 
   async function resync() {
     setResyncing(true);
@@ -46,21 +44,6 @@ export function PushSubscribeButton() {
     setState("granted");
   }
 
-  async function handleTest() {
-    setTestStatus("sending");
-    setTestError(null);
-    try {
-      const res = await fetch("/api/push/test", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to send test notification.");
-      setTestStatus("sent");
-      setTimeout(() => setTestStatus("idle"), 2500);
-    } catch (e) {
-      setTestStatus("error");
-      setTestError(e instanceof Error ? e.message : "Something went wrong.");
-    }
-  }
-
   if (state === "granted") {
     if (error) {
       return (
@@ -82,24 +65,8 @@ export function PushSubscribeButton() {
     }
 
     return (
-      <div className="space-y-2">
-        <div className="flex items-center gap-2 rounded-xl bg-success/10 px-3.5 py-2.5 text-sm text-success">
-          <BellRing size={15} /> Notifications enabled
-        </div>
-        <button
-          type="button"
-          onClick={handleTest}
-          disabled={testStatus === "sending" || resyncing}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-border px-3.5 py-2 text-xs font-medium text-muted transition hover:text-foreground disabled:opacity-50"
-        >
-          <Send size={13} />
-          {testStatus === "sending"
-            ? "Sending…"
-            : testStatus === "sent"
-              ? "Sent — check your phone"
-              : "Send test notification"}
-        </button>
-        {testStatus === "error" && <p className="text-xs text-danger">{testError}</p>}
+      <div className="flex items-center gap-2 rounded-xl bg-success/10 px-3.5 py-2.5 text-sm text-success">
+        <BellRing size={15} /> Notifications enabled
       </div>
     );
   }

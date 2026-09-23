@@ -116,6 +116,14 @@ grant select, insert, update, delete on
   profiles, tasks, task_sessions, streak_freezes, distractions, reflections, push_subscriptions, subtasks
   to authenticated;
 
+-- The service role (used server-side by the notification cron, bypassing
+-- RLS) also needs explicit grants when "Automatically expose new tables" is
+-- off — it isn't exempted from that setting despite being an admin-style key.
+grant usage on schema public to service_role;
+grant select, insert, update, delete on
+  profiles, tasks, task_sessions, streak_freezes, distractions, reflections, push_subscriptions, subtasks
+  to service_role;
+
 -- Auto-create a profile row whenever a new auth user signs up.
 create or replace function public.handle_new_user()
 returns trigger

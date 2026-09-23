@@ -1,31 +1,36 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { X } from "lucide-react";
 import { updateNotificationSettings } from "@/lib/actions";
 import type { Profile } from "@/lib/database.types";
 
-type Slot = string | null;
+// Must match the schedules in vercel.json exactly — these are the actual
+// fixed UTC times the cron fires at (plus up to a 1-hour flex window on
+// Vercel's Hobby plan). Not user-editable: a slot is either on or off.
+const SLOT_UTC_HOURS = [8, 12, 16, 20] as const;
+const SLOT_FIXED_TIME: Record<number, string> = { 8: "08:00", 12: "12:00", 16: "16:00", 20: "20:00" };
 
-function toSlotValue(time: string | null): Slot {
-  return time ? time.slice(0, 5) : null;
+function localLabelForUtcHour(utcHour: number): string {
+  const d = new Date();
+  d.setUTCHours(utcHour, 0, 0, 0);
+  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
 export function NotificationSettingsForm({ profile }: { profile: Profile }) {
-  const [times, setTimes] = useState<[Slot, Slot, Slot, Slot]>([
-    toSlotValue(profile.notify_time_1),
-    toSlotValue(profile.notify_time_2),
-    toSlotValue(profile.notify_time_3),
-    toSlotValue(profile.notify_time_4),
+  const [slotsOn, setSlotsOn] = useState<[boolean, boolean, boolean, boolean]>([
+    !!profile.notify_time_1,
+    !!profile.notify_time_2,
+    !!profile.notify_time_3,
+    !!profile.notify_time_4,
   ]);
   const [enabled, setEnabled] = useState(profile.notifications_enabled);
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
 
-  function setSlot(index: number, value: string) {
-    setTimes((prev) => {
-      const next = [...prev] as [Slot, Slot, Slot, Slot];
-      next[index] = value || null;
+  function toggleSlot(index: number) {
+    setSlotsOn((prev) => {
+      const next = [...prev] as [boolean, boolean, boolean, boolean];
+      next[index] = !next[index];
       return next;
     });
   }
@@ -33,7 +38,12 @@ export function NotificationSettingsForm({ profile }: { profile: Profile }) {
   function handleSave() {
     startTransition(async () => {
       await updateNotificationSettings({
-        notifyTimes: times,
+        notifyTimes: SLOT_UTC_HOURS.map((h, i) => (slotsOn[i] ? SLOT_FIXED_TIME[h] : null)) as [
+          string | null,
+          string | null,
+          string | null,
+          string | null,
+        ],
         notificationsEnabled: enabled,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
@@ -59,33 +69,28 @@ export function NotificationSettingsForm({ profile }: { profile: Profile }) {
       </div>
 
       <p className="text-[11px] text-muted">
-        Up to 4 reminder times a day. Leave a slot empty to turn it off — each one only pings
-        if you&rsquo;ve still got unfinished tasks.
+        Times are shown in your local time zone. You&rsquo;ll only be notified if you still have
+        tasks left to complete, and reminders may arrive up to an hour later than shown.
       </p>
 
-      <div className="grid grid-cols-2 gap-3">
-        {times.map((time, i) => (
-          <div key={i}>
-            <label className="mb-1 block text-[11px] text-muted">Reminder {i + 1}</label>
-            <div className="flex items-center gap-1.5">
+      <div className="space-y-2">
+        {SLOT_UTC_HOURS.map((utcHour, i) => (
+          <label
+            key={utcHour}
+            className="flex items-center justify-between rounded-xl border border-border bg-surface-raised px-3 py-2"
+          >
+            <span className="text-sm">{localLabelForUtcHour(utcHour)}</span>
+            <span className="relative inline-flex cursor-pointer items-center">
               <input
-                type="time"
-                value={time ?? ""}
-                onChange={(e) => setSlot(i, e.target.value)}
-                className="w-full rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm outline-none focus:border-accent"
+                type="checkbox"
+                checked={slotsOn[i]}
+                onChange={() => toggleSlot(i)}
+                className="peer sr-only"
               />
-              {time && (
-                <button
-                  type="button"
-                  onClick={() => setSlot(i, "")}
-                  className="shrink-0 text-muted hover:text-danger"
-                  aria-label={`Clear reminder ${i + 1}`}
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-          </div>
+              <span className="h-5 w-9 rounded-full bg-border transition peer-checked:bg-accent" />
+              <span className="absolute left-0.5 h-4 w-4 rounded-full bg-white transition peer-checked:translate-x-4" />
+            </span>
+          </label>
         ))}
       </div>
 
@@ -95,7 +100,7 @@ export function NotificationSettingsForm({ profile }: { profile: Profile }) {
         disabled={pending}
         className="w-full rounded-xl bg-accent-soft/50 py-2 text-xs font-medium text-foreground disabled:opacity-50"
       >
-        {saved ? "Saved" : pending ? "Saving…" : "Save times"}
+        {saved ? "Saved" : pending ? "Saving…" : "Save"}
       </button>
     </div>
   );
