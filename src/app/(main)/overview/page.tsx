@@ -141,7 +141,7 @@ export default async function OverviewPage() {
                   hour: "numeric",
                   minute: "2-digit",
                 })}
-                {d.note ? ` — ${d.note}` : ""}
+                {d.note ? `: ${d.note}` : ""}
               </li>
             ))}
           </ul>

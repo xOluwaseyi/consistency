@@ -43,7 +43,10 @@ html {
 }
 
 body {
-  background: radial-gradient(circle at top, #17172a 0%, var(--background) 60%);
+  background-color: var(--background);
+  background-image: radial-gradient(ellipse 900px 500px at top, #17172a 0%, transparent 100%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--foreground);
   min-height: 100dvh;
 }

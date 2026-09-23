@@ -96,8 +96,8 @@ export async function sendSlotReminders(slot: 1 | 2 | 3 | 4): Promise<number> {
     const { streak } = await computeStreakContext(supabase, profile.id);
     const body =
       remaining === 1
-        ? `1 task left today${streak > 0 ? ` — keep the ${streak}-day streak alive` : ""}.`
-        : `${remaining} tasks left today${streak > 0 ? ` — keep the ${streak}-day streak alive` : ""}.`;
+        ? `1 task left today.${streak > 0 ? ` Keep the ${streak}-day streak alive.` : ""}`
+        : `${remaining} tasks left today.${streak > 0 ? ` Keep the ${streak}-day streak alive.` : ""}`;
 
     await notifyUser(profile.id, { title: "Still time today", body, url: "/today" });
     sent += 1;

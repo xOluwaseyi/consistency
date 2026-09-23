@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Smartphone } from "lucide-react";
 import { addDistraction } from "@/lib/actions";
+import { InfoTooltip } from "@/components/InfoTooltip";
 
 export function DistractionButton() {
   const [open, setOpen] = useState(false);
@@ -23,26 +24,29 @@ export function DistractionButton() {
   if (logged) {
     return (
       <div className="rounded-2xl border border-border bg-surface px-4 py-3 text-center text-xs text-muted">
-        Logged. Back to it — you&rsquo;ve got this.
+        Logged. Back to it, you&rsquo;ve got this.
       </div>
     );
   }
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3 text-xs font-medium text-muted transition hover:text-foreground"
-      >
-        <Smartphone size={14} /> Got distracted?
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3 text-xs font-medium text-muted transition hover:text-foreground"
+        >
+          <Smartphone size={14} /> Got distracted?
+        </button>
+        <InfoTooltip text="Logs the time and, optionally, what pulled you away. No effect on your streak, it just shows up in your weekly overview so you can notice patterns." />
+      </div>
     );
   }
 
   return (
     <div className="space-y-2 rounded-2xl border border-border bg-surface p-3.5">
-      <p className="text-xs text-muted">No judgment — logging it is half the fix.</p>
+      <p className="text-xs text-muted">No judgment, logging it is half the fix.</p>
       <input
         value={note}
         onChange={(e) => setNote(e.target.value)}

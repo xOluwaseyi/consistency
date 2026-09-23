@@ -325,7 +325,7 @@ export function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => 
                       : "running"}
                   </span>
                   <span className="font-mono tabular-nums">
-                    {session.duration_seconds != null ? formatDuration(session.duration_seconds) : "—"}
+                    {session.duration_seconds != null ? formatDuration(session.duration_seconds) : "…"}
                   </span>
                 </div>
               ))}

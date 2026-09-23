@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Consistency — Task Tracker",
+  title: "Consistency: Task Tracker",
   description: "Plan your days, track time on what matters, and keep the streak alive.",
   appleWebApp: {
     capable: true,

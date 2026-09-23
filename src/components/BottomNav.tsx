@@ -2,23 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, ListChecks, BarChart3, Settings } from "lucide-react";
+import { NAV_ITEMS } from "@/lib/nav-items";
 import { cn } from "@/lib/utils";
-
-const ITEMS = [
-  { href: "/today", label: "Today", icon: ListChecks },
-  { href: "/week", label: "Week", icon: CalendarDays },
-  { href: "/overview", label: "Overview", icon: BarChart3 },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
 
 export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="sticky bottom-0 z-20 border-t border-border bg-surface/90 backdrop-blur-lg pb-[env(safe-area-inset-bottom)]">
+    <nav className="sticky bottom-0 z-20 border-t border-border bg-surface/90 backdrop-blur-lg pb-[env(safe-area-inset-bottom)] lg:hidden">
       <div className="mx-auto flex max-w-md items-stretch justify-around">
-        {ITEMS.map(({ href, label, icon: Icon }) => {
+        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = pathname?.startsWith(href);
           return (
             <Link
