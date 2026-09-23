@@ -38,6 +38,7 @@ export async function getTasksForDate(date: string): Promise<Task[]> {
     .select("*")
     .eq("user_id", user.id)
     .eq("scheduled_date", date)
+    .order("completed", { ascending: true })
     .order("priority", { ascending: false })
     .order("created_at", { ascending: true });
 
@@ -55,7 +56,10 @@ export async function getTasksForRange(startDate: string, endDate: string): Prom
     .eq("user_id", user.id)
     .gte("scheduled_date", startDate)
     .lte("scheduled_date", endDate)
-    .order("scheduled_date", { ascending: true });
+    .order("scheduled_date", { ascending: true })
+    .order("completed", { ascending: true })
+    .order("priority", { ascending: false })
+    .order("created_at", { ascending: true });
 
   return (data ?? []) as Task[];
 }

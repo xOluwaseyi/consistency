@@ -12,9 +12,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const description = "Plan your days, track time on what matters, and keep the streak alive.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL("https://useconsistency.vercel.app"),
   title: "Consistency: Task Tracker",
-  description: "Plan your days, track time on what matters, and keep the streak alive.",
+  description,
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -23,6 +26,18 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon-32.png",
     apple: "/icons/apple-touch-icon.png",
+  },
+  openGraph: {
+    title: "Consistency: Plan the day. Protect the streak.",
+    description,
+    url: "/",
+    siteName: "Consistency",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Consistency: Plan the day. Protect the streak.",
+    description,
   },
 };
 
