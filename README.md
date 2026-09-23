@@ -3,7 +3,7 @@
 A simple app for planning your day, tracking how long things actually take,
 and building a streak of days where you got everything done.
 
-**Try it here:** [consistency-drab.vercel.app](https://consistency-drab.vercel.app/)
+**Try it here:** [useconsistency.vercel.app](https://useconsistency.vercel.app/)
 
 ## What it does
 
@@ -47,7 +47,7 @@ your timers, or your streak.
 
 ## Try it
 
-Open **[consistency-drab.vercel.app](https://consistency-drab.vercel.app/)**,
+Open **[useconsistency.vercel.app](https://useconsistency.vercel.app/)**,
 create an account with your email and a password, and start adding tasks for
 today. On your phone, open the same link in Chrome, tap the menu, and choose
 "Add to Home screen" to install it properly.
@@ -96,7 +96,7 @@ Open `http://localhost:3000`, sign up with your email/password on the login scre
 
 #### About notification timing
 
-Vercel's free (Hobby) plan only allows cron jobs to run **once a day at a fixed time**, so the four reminders currently fire at fixed UTC times (08:00 / 12:00 / 16:00 / 20:00) rather than the exact minutes you pick per-slot in Settings — those Settings fields are there for whenever you want tighter control. Each slot only actually sends a notification if you've still got unfinished tasks, so an unused or redundant slot is harmless. If you want the *exact* times you set, point a free external pinger (e.g. [cron-job.org](https://cron-job.org)) at `https://your-app.vercel.app/api/cron/notify/1` through `/4` on whatever schedule you like, with an `Authorization: Bearer <CRON_SECRET>` header — same secret you put in Vercel's env vars. Either way, delete or ignore the ones in `vercel.json` if you go this route.
+Vercel's free (Hobby) plan only allows cron jobs to run **once a day at a fixed time**, so the four reminders fire at fixed UTC times (08:00 / 12:00 / 16:00 / 20:00), each with up to an hour of flex on Hobby. Settings reflects this honestly — it's 4 on/off toggles showing those times converted to your local time zone, not a free-time picker, since anything more precise isn't actually achievable on this plan. Each slot only sends a notification if there are still unfinished tasks, so an unused slot is harmless. If you want real per-minute control, point a free external pinger (e.g. [cron-job.org](https://cron-job.org)) at `https://your-app.vercel.app/api/cron/notify/1` through `/4` on whatever schedule you like, with an `Authorization: Bearer <CRON_SECRET>` header — same secret you put in Vercel's env vars. Either way, delete or ignore the ones in `vercel.json` if you go this route.
 
 ### Project structure
 
