@@ -80,7 +80,11 @@ const NOTIFY_TIME_COLUMNS = ["notify_time_1", "notify_time_2", "notify_time_3", 
  * haven't already sent for that slot today, and they still have unfinished
  * tasks, send the reminder and record it so it only fires once per day.
  */
-export async function pollAndSendReminders(): Promise<{ sent: number; checked: number }> {
+export async function pollAndSendReminders(): Promise<{
+  sent: number;
+  checked: number;
+  failed: { userId: string; slot: number; reason: string }[];
+}> {
   const supabase = createAdminClient();
 
   const { data: profiles } = await supabase
@@ -90,6 +94,7 @@ export async function pollAndSendReminders(): Promise<{ sent: number; checked: n
 
   let sent = 0;
   let checked = 0;
+  const failed: { userId: string; slot: number; reason: string }[] = [];
 
   for (const profile of profiles ?? []) {
     const today = todayInTimezone(profile.timezone);
@@ -131,7 +136,23 @@ export async function pollAndSendReminders(): Promise<{ sent: number; checked: n
           ? `1 task left today.${streak > 0 ? ` Keep the ${streak}-day streak alive.` : ""}`
           : `${remaining} tasks left today.${streak > 0 ? ` Keep the ${streak}-day streak alive.` : ""}`;
 
-      await notifyUser(profile.id, { title: "Still time today", body, url: "/today" });
+      const result = await notifyUser(profile.id, {
+        title: "Still time today",
+        body,
+        url: "/today",
+      });
+
+      if (result.sent === 0) {
+        // Delivery actually failed (e.g. no subscription, push service
+        // rejected it) — don't mark it sent, so it's retried next poll
+        // instead of silently never firing again today.
+        failed.push({
+          userId: profile.id,
+          slot,
+          reason: result.failed[0]?.reason ?? "Unknown failure",
+        });
+        continue;
+      }
 
       // Record success so this slot doesn't fire again today. Ignore a
       // conflict (another poll run already claimed it) rather than error.
@@ -140,5 +161,5 @@ export async function pollAndSendReminders(): Promise<{ sent: number; checked: n
     }
   }
 
-  return { sent, checked };
+  return { sent, checked, failed };
 }
