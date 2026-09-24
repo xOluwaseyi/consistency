@@ -61,47 +61,84 @@ export function todayInTimezone(timezone: string): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date());
 }
 
+/** "HH:MM" right now, in the given timezone. */
+function nowHHMMInTimezone(timezone: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date());
+}
+
 const NOTIFY_TIME_COLUMNS = ["notify_time_1", "notify_time_2", "notify_time_3", "notify_time_4"] as const;
 
 /**
- * Sends the reminder for one of the 4 daily slots to every user who has that
- * slot set. Skips a user if the slot is empty, they have no tasks today, or
- * everything's already done (nothing to nag about).
+ * Called every few minutes (by a GitHub Actions cron hitting /api/cron/poll).
+ * For every user with reminders on, checks each of their 4 slots: if the
+ * slot's target time has passed for "today" in their timezone, and we
+ * haven't already sent for that slot today, and they still have unfinished
+ * tasks, send the reminder and record it so it only fires once per day.
  */
-export async function sendSlotReminders(slot: 1 | 2 | 3 | 4): Promise<number> {
+export async function pollAndSendReminders(): Promise<{ sent: number; checked: number }> {
   const supabase = createAdminClient();
-  const column = NOTIFY_TIME_COLUMNS[slot - 1];
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select(`id, timezone, ${column}`)
-    .eq("notifications_enabled", true)
-    .not(column, "is", null);
+    .select("id, timezone, notify_time_1, notify_time_2, notify_time_3, notify_time_4")
+    .eq("notifications_enabled", true);
 
   let sent = 0;
+  let checked = 0;
 
-  for (const profile of (profiles ?? []) as Array<{ id: string; timezone: string }>) {
-    const date = todayInTimezone(profile.timezone);
-    const { data: tasks } = await supabase
-      .from("tasks")
-      .select("id, completed")
-      .eq("user_id", profile.id)
-      .eq("scheduled_date", date);
+  for (const profile of profiles ?? []) {
+    const today = todayInTimezone(profile.timezone);
+    const nowHHMM = nowHHMMInTimezone(profile.timezone);
 
-    if (!tasks || tasks.length === 0) continue;
+    for (let i = 0; i < 4; i++) {
+      const slot = i + 1;
+      const targetTime = profile[NOTIFY_TIME_COLUMNS[i]];
+      if (!targetTime) continue;
 
-    const remaining = tasks.filter((t) => !t.completed).length;
-    if (remaining === 0) continue;
+      // Target time is stored as "HH:MM:SS"; compare on "HH:MM".
+      const targetHHMM = targetTime.slice(0, 5);
+      if (targetHHMM > nowHHMM) continue; // hasn't reached this slot's time yet today
 
-    const { streak } = await computeStreakContext(supabase, profile.id);
-    const body =
-      remaining === 1
-        ? `1 task left today.${streak > 0 ? ` Keep the ${streak}-day streak alive.` : ""}`
-        : `${remaining} tasks left today.${streak > 0 ? ` Keep the ${streak}-day streak alive.` : ""}`;
+      checked += 1;
 
-    await notifyUser(profile.id, { title: "Still time today", body, url: "/today" });
-    sent += 1;
+      const { data: alreadySent } = await supabase
+        .from("sent_reminders")
+        .select("id")
+        .eq("user_id", profile.id)
+        .eq("slot", slot)
+        .eq("date", today)
+        .maybeSingle();
+      if (alreadySent) continue;
+
+      const { data: tasks } = await supabase
+        .from("tasks")
+        .select("id, completed")
+        .eq("user_id", profile.id)
+        .eq("scheduled_date", today);
+
+      if (!tasks || tasks.length === 0) continue; // nothing planned, try again next poll
+      const remaining = tasks.filter((t) => !t.completed).length;
+      if (remaining === 0) continue; // already done, try again next poll (in case more get added)
+
+      const { streak } = await computeStreakContext(supabase, profile.id);
+      const body =
+        remaining === 1
+          ? `1 task left today.${streak > 0 ? ` Keep the ${streak}-day streak alive.` : ""}`
+          : `${remaining} tasks left today.${streak > 0 ? ` Keep the ${streak}-day streak alive.` : ""}`;
+
+      await notifyUser(profile.id, { title: "Still time today", body, url: "/today" });
+
+      // Record success so this slot doesn't fire again today. Ignore a
+      // conflict (another poll run already claimed it) rather than error.
+      await supabase.from("sent_reminders").insert({ user_id: profile.id, slot, date: today });
+      sent += 1;
+    }
   }
 
-  return sent;
+  return { sent, checked };
 }

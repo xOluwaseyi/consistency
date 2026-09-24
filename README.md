@@ -132,8 +132,8 @@ itself.
 
 - **Next.js** (React) for the app itself, deployed on **Vercel**
 - **Supabase** (Postgres) for the database, accounts, and login
-- The **Web Push API** for phone notifications, sent on a schedule by
-  Vercel's cron jobs
+- The **Web Push API** for phone notifications, triggered by a **GitHub
+  Actions** cron polling the app every few minutes
 
 ### 1. Create a Supabase project
 
@@ -159,13 +159,20 @@ Open `http://localhost:3000`, sign up with your email/password on the login scre
 1. Push this repo to GitHub, then import it into [Vercel](https://vercel.com).
 2. In the Vercel project's **Settings → Environment Variables**, add everything from `.env.local`:
    `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (set this to `mailto:your-real-email`), and `CRON_SECRET`.
-3. Deploy. `vercel.json` already defines four daily cron jobs (`/api/cron/notify/1` at 08:00 UTC, `/2` at 12:00, `/3` at 16:00, `/4` at 20:00) that Vercel will call automatically. No extra setup needed.
-4. On your phone, open the deployed URL in Chrome, tap the menu → **Add to Home screen**. That's your "app."
-5. Open it once installed, go to **Settings → Enable notifications**, and grant permission when Android prompts you.
+3. On your phone, open the deployed URL in Chrome, tap the menu → **Add to Home screen**. That's your "app."
+4. Open it once installed, go to **Settings → Enable notifications**, and grant permission when Android prompts you.
 
-#### About notification timing
+#### Setting up reminder delivery (GitHub Actions)
 
-Vercel's free (Hobby) plan only allows cron jobs to run **once a day at a fixed time**, so the four reminders fire at fixed UTC times (08:00 / 12:00 / 16:00 / 20:00), each with up to an hour of flex on Hobby. Settings reflects this honestly: it's 4 on/off toggles showing those times converted to your local time zone, not a free-time picker, since anything more precise isn't actually achievable on this plan. Each slot only sends a notification if there are still unfinished tasks, so an unused slot is harmless. If you want real per-minute control, point a free external pinger (e.g. [cron-job.org](https://cron-job.org)) at `https://your-app.vercel.app/api/cron/notify/1` through `/4` on whatever schedule you like, with an `Authorization: Bearer <CRON_SECRET>` header (same secret you put in Vercel's env vars). Either way, delete or ignore the ones in `vercel.json` if you go this route.
+Vercel's free (Hobby) plan only allows cron jobs to run once a day at a fixed time, which isn't enough for users to each pick their own reminder times. Instead, this repo includes a GitHub Actions workflow ([`.github/workflows/notify-poll.yml`](.github/workflows/notify-poll.yml)) that pings `/api/cron/poll` every 5 minutes. That endpoint checks every user's own chosen times against the current time (in their own time zone) and sends a reminder to anyone whose time has just passed, if they still have unfinished tasks. Each slot only fires once per day, tracked in the `sent_reminders` table.
+
+To turn this on:
+
+1. In your GitHub repo, go to **Settings → Secrets and variables → Actions**.
+2. Add a new repository secret named `CRON_SECRET`, using the same value you set in Vercel's environment variables.
+3. That's it. The workflow runs automatically on its schedule once it's on the default branch, and you can trigger it manually from the **Actions** tab (`workflow_dispatch`) to test it right away instead of waiting for the next 5-minute tick.
+
+This only works for free on a **public** repository, GitHub Actions minutes are unlimited there. A private repo gets a limited free minutes allowance per month, and polling every 5 minutes would exceed it.
 
 ### Project structure
 
@@ -175,6 +182,7 @@ Vercel's free (Hobby) plan only allows cron jobs to run **once a day at a fixed 
 - `src/lib/streak.ts`: the streak math (what counts as a "won" day, current/longest streak).
 - `src/app/(main)/*`: the four main screens, behind a bottom nav on mobile and a sidebar on desktop (>=1024px).
 - `src/app/page.tsx`: the public landing page at `/`, shown to signed-out visitors.
-- `src/app/api/cron/notify/[slot]`: the notification endpoint Vercel (or your own pinger) calls once per configured slot (1-4).
+- `src/app/api/cron/poll`: the endpoint the GitHub Actions workflow calls every 5 minutes to check everyone's reminder times and send what's due.
+- `.github/workflows/notify-poll.yml`: the scheduled workflow that calls it.
 - `public/sw.js`: the service worker (installability + push notification handling).
 - `public/screenshots/`: the images used on the landing page and in this README.

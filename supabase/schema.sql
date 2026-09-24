@@ -89,6 +89,19 @@ create table if not exists subtasks (
 
 create index if not exists subtasks_task_idx on subtasks (task_id);
 
+-- Tracks which reminder slots have already fired today, so the polling
+-- endpoint (called every few minutes) doesn't send the same reminder twice.
+create table if not exists sent_reminders (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  slot smallint not null,
+  date date not null,
+  sent_at timestamptz not null default now(),
+  unique (user_id, slot, date)
+);
+
+create index if not exists sent_reminders_lookup_idx on sent_reminders (user_id, slot, date);
+
 -- Row Level Security: every table is scoped to auth.uid().
 alter table profiles enable row level security;
 alter table tasks enable row level security;
@@ -98,6 +111,7 @@ alter table distractions enable row level security;
 alter table reflections enable row level security;
 alter table push_subscriptions enable row level security;
 alter table subtasks enable row level security;
+alter table sent_reminders enable row level security;
 
 create policy "own profile" on profiles for all using (auth.uid() = id) with check (auth.uid() = id);
 create policy "own tasks" on tasks for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
@@ -107,6 +121,7 @@ create policy "own distractions" on distractions for all using (auth.uid() = use
 create policy "own reflections" on reflections for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own push subs" on push_subscriptions for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own subtasks" on subtasks for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own sent reminders" on sent_reminders for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- Table-level grants for the Data API (PostgREST). Needed if your project has
 -- "Automatically expose new tables" turned off — RLS above still restricts
@@ -116,12 +131,12 @@ grant select, insert, update, delete on
   profiles, tasks, task_sessions, streak_freezes, distractions, reflections, push_subscriptions, subtasks
   to authenticated;
 
--- The service role (used server-side by the notification cron, bypassing
+-- The service role (used server-side by the notification poller, bypassing
 -- RLS) also needs explicit grants when "Automatically expose new tables" is
 -- off — it isn't exempted from that setting despite being an admin-style key.
 grant usage on schema public to service_role;
 grant select, insert, update, delete on
-  profiles, tasks, task_sessions, streak_freezes, distractions, reflections, push_subscriptions, subtasks
+  profiles, tasks, task_sessions, streak_freezes, distractions, reflections, push_subscriptions, subtasks, sent_reminders
   to service_role;
 
 -- Auto-create a profile row whenever a new auth user signs up.

@@ -135,6 +135,21 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["subtasks"]["Row"]>;
       } & NoRelationships;
+      sent_reminders: {
+        Row: {
+          id: string;
+          user_id: string;
+          slot: number;
+          date: string;
+          sent_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["sent_reminders"]["Row"]> & {
+          user_id: string;
+          slot: number;
+          date: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["sent_reminders"]["Row"]>;
+      } & NoRelationships;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
