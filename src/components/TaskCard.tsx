@@ -6,7 +6,8 @@ import { toggleTaskComplete, deleteTask, stopTimerSession } from "@/lib/actions"
 import { TimerControl } from "@/components/TimerControl";
 import { TaskDetailModal } from "@/components/TaskDetailModal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { cn } from "@/lib/utils";
+import { cn, formatClock } from "@/lib/utils";
+import { todayKey } from "@/lib/streak";
 import type { Task } from "@/lib/database.types";
 
 const PRIORITY_STYLES: Record<Task["priority"], string> = {
@@ -33,10 +34,12 @@ export function TaskCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [completed, setCompleted] = useOptimistic(task.completed);
 
+  const locked = task.scheduled_date < todayKey();
   const canComplete = !subtaskCounts || subtaskCounts.total === 0 || subtaskCounts.completed === subtaskCounts.total;
 
   function handleToggle(e: React.MouseEvent) {
     e.stopPropagation();
+    if (locked) return;
     setError(null);
     const next = !completed;
     startTransition(async () => {
@@ -67,7 +70,7 @@ export function TaskCard({
           <button
             type="button"
             onClick={handleToggle}
-            disabled={pending || (!canComplete && !completed)}
+            disabled={pending || locked || (!canComplete && !completed)}
             className={cn(
               "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition active:scale-90",
               completed
@@ -80,7 +83,7 @@ export function TaskCard({
           >
             {completed ? (
               <Check size={14} strokeWidth={3} />
-            ) : !canComplete ? (
+            ) : locked || !canComplete ? (
               <Lock size={11} />
             ) : null}
           </button>
@@ -123,9 +126,15 @@ export function TaskCard({
                   {subtaskCounts.completed}/{subtaskCounts.total}
                 </span>
               )}
-              <div onClick={(e) => e.stopPropagation()}>
-                <TimerControl taskId={task.id} openSession={openSession} totalSeconds={totalSeconds} />
-              </div>
+              {locked ? (
+                <span className="font-mono text-xs text-muted tabular-nums">
+                  {formatClock(totalSeconds)}
+                </span>
+              ) : (
+                <div onClick={(e) => e.stopPropagation()}>
+                  <TimerControl taskId={task.id} openSession={openSession} totalSeconds={totalSeconds} />
+                </div>
+              )}
             </div>
 
             {showWhy && task.why && (
@@ -136,22 +145,26 @@ export function TaskCard({
             {error && <p className="mt-2 text-xs text-danger">{error}</p>}
           </div>
 
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setConfirmDelete(true);
-            }}
-            disabled={pending}
-            className="shrink-0 text-muted hover:text-danger"
-            aria-label="Delete task"
-          >
-            <Trash2 size={15} />
-          </button>
+          {!locked && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setConfirmDelete(true);
+              }}
+              disabled={pending}
+              className="shrink-0 text-muted hover:text-danger"
+              aria-label="Delete task"
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
         </div>
       </div>
 
-      {detailOpen && <TaskDetailModal task={task} onClose={() => setDetailOpen(false)} />}
+      {detailOpen && (
+        <TaskDetailModal task={task} locked={locked} onClose={() => setDetailOpen(false)} />
+      )}
       {confirmDelete && (
         <ConfirmDialog
           title="Delete this task?"

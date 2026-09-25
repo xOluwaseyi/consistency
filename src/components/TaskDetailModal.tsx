@@ -20,7 +20,15 @@ const PRIORITY_STYLES: Record<Task["priority"], string> = {
   low: "bg-priority-low/15 text-priority-low border-priority-low/30",
 };
 
-export function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => void }) {
+export function TaskDetailModal({
+  task,
+  locked = false,
+  onClose,
+}: {
+  task: Task;
+  locked?: boolean;
+  onClose: () => void;
+}) {
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [sessions, setSessions] = useState<TaskSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,6 +100,7 @@ export function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => 
   }
 
   async function handleToggleComplete() {
+    if (locked) return;
     const next = !completed;
     setCompleteError(null);
 
@@ -159,7 +168,7 @@ export function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => 
           <button
             type="button"
             onClick={handleToggleComplete}
-            disabled={!canComplete && !completed}
+            disabled={locked || (!canComplete && !completed)}
             className={cn(
               "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition active:scale-90",
               completed
@@ -172,7 +181,7 @@ export function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => 
           >
             {completed ? (
               <Check size={14} strokeWidth={3} />
-            ) : !canComplete ? (
+            ) : locked || !canComplete ? (
               <Lock size={11} />
             ) : null}
           </button>
@@ -217,22 +226,24 @@ export function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => 
                 <p className="font-mono text-xl tabular-nums">{formatClock(totalSeconds)}</p>
               )}
             </div>
-            <button
-              type="button"
-              onClick={openSession ? handlePause : handleResume}
-              disabled={loading}
-              className={cn(
-                "flex h-12 w-12 items-center justify-center rounded-full transition active:scale-90 disabled:opacity-40",
-                openSession ? "bg-danger/15 text-danger" : "bg-success/15 text-success",
-              )}
-              aria-label={openSession ? "Pause timer" : "Start timer"}
-            >
-              {openSession ? (
-                <Pause size={20} fill="currentColor" />
-              ) : (
-                <Play size={20} fill="currentColor" className="ml-0.5" />
-              )}
-            </button>
+            {!locked && (
+              <button
+                type="button"
+                onClick={openSession ? handlePause : handleResume}
+                disabled={loading}
+                className={cn(
+                  "flex h-12 w-12 items-center justify-center rounded-full transition active:scale-90 disabled:opacity-40",
+                  openSession ? "bg-danger/15 text-danger" : "bg-success/15 text-success",
+                )}
+                aria-label={openSession ? "Pause timer" : "Start timer"}
+              >
+                {openSession ? (
+                  <Pause size={20} fill="currentColor" />
+                ) : (
+                  <Play size={20} fill="currentColor" className="ml-0.5" />
+                )}
+              </button>
+            )}
           </div>
 
         <div className="mb-4">
@@ -256,7 +267,7 @@ export function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => 
                   <button
                     type="button"
                     onClick={() => handleToggleSubtask(subtask)}
-                    disabled={subtask.id.startsWith("temp-")}
+                    disabled={locked || subtask.id.startsWith("temp-")}
                     className={cn(
                       "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition",
                       subtask.completed ? "border-success bg-success text-background" : "border-muted",
@@ -273,34 +284,38 @@ export function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => 
                   >
                     {subtask.title}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteSubtask(subtask.id)}
-                    className="shrink-0 text-muted hover:text-danger"
-                    aria-label="Delete subtask"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                  {!locked && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteSubtask(subtask.id)}
+                      className="shrink-0 text-muted hover:text-danger"
+                      aria-label="Delete subtask"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
           )}
-          <form onSubmit={handleAddSubtask} className="mt-1.5 flex items-center gap-1.5">
-            <input
-              value={newSubtask}
-              onChange={(e) => setNewSubtask(e.target.value)}
-              placeholder="Add a subtask…"
-              className="min-w-0 flex-1 rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm outline-none focus:border-accent"
-            />
-            <button
-              type="submit"
-              disabled={!newSubtask.trim()}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft/50 text-foreground disabled:opacity-50"
-              aria-label="Add subtask"
-            >
-              <Plus size={16} />
-            </button>
-          </form>
+          {!locked && (
+            <form onSubmit={handleAddSubtask} className="mt-1.5 flex items-center gap-1.5">
+              <input
+                value={newSubtask}
+                onChange={(e) => setNewSubtask(e.target.value)}
+                placeholder="Add a subtask…"
+                className="min-w-0 flex-1 rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+              <button
+                type="submit"
+                disabled={!newSubtask.trim()}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft/50 text-foreground disabled:opacity-50"
+                aria-label="Add subtask"
+              >
+                <Plus size={16} />
+              </button>
+            </form>
+          )}
         </div>
 
         {sessions.length > 0 && (
@@ -333,11 +348,19 @@ export function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => 
           </div>
         )}
 
-        {!completed && !canComplete && (
+        {locked ? (
           <p className="text-center text-xs text-muted">
             <Lock size={11} className="mr-1 inline" />
-            Finish all subtasks, then tap the checkbox above to complete.
+            This day has passed, so this task can no longer be changed.
           </p>
+        ) : (
+          !completed &&
+          !canComplete && (
+            <p className="text-center text-xs text-muted">
+              <Lock size={11} className="mr-1 inline" />
+              Finish all subtasks, then tap the checkbox above to complete.
+            </p>
+          )
         )}
       </div>
     </div>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { todayKey } from "@/lib/streak";
 import type { TaskPriority } from "@/lib/database.types";
 
 const MAX_FREEZES_PER_MONTH = 3;
@@ -16,6 +17,21 @@ async function requireUser() {
   return { supabase, user };
 }
 
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+
+/** Past days are locked: no editing, completing, timing, or deleting. */
+async function assertTaskEditable(supabase: SupabaseServerClient, taskId: string) {
+  const { data: task } = await supabase
+    .from("tasks")
+    .select("scheduled_date")
+    .eq("id", taskId)
+    .single();
+
+  if (task && task.scheduled_date < todayKey()) {
+    throw new Error("This task is from a past day and can no longer be changed.");
+  }
+}
+
 export async function createTask(input: {
   title: string;
   why?: string;
@@ -24,6 +40,10 @@ export async function createTask(input: {
   scheduledDate: string;
 }) {
   const { supabase, user } = await requireUser();
+
+  if (input.scheduledDate < todayKey()) {
+    throw new Error("Can't add a task to a day that's already passed.");
+  }
 
   const { error } = await supabase.from("tasks").insert({
     user_id: user.id,
@@ -92,13 +112,12 @@ export async function copyRecurringTasks(targetDate: string): Promise<number> {
 
 export async function deleteTask(taskId: string) {
   const { supabase } = await requireUser();
+  await assertTaskEditable(supabase, taskId);
   const { error } = await supabase.from("tasks").delete().eq("id", taskId);
   if (error) throw new Error(error.message);
   revalidatePath("/today");
   revalidatePath("/week");
 }
-
-type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 async function assertCanComplete(supabase: SupabaseServerClient, taskId: string) {
   const { count: subtaskTotal } = await supabase
@@ -122,6 +141,7 @@ async function assertCanComplete(supabase: SupabaseServerClient, taskId: string)
 export async function toggleTaskComplete(taskId: string, completed: boolean) {
   const { supabase, user } = await requireUser();
 
+  await assertTaskEditable(supabase, taskId);
   if (completed) {
     await assertCanComplete(supabase, taskId);
   }
@@ -140,6 +160,8 @@ export async function toggleTaskComplete(taskId: string, completed: boolean) {
 
 export async function startTimerSession(taskId: string) {
   const { supabase, user } = await requireUser();
+
+  await assertTaskEditable(supabase, taskId);
 
   const { data, error } = await supabase
     .from("task_sessions")
@@ -201,6 +223,8 @@ export async function getTaskDetail(taskId: string) {
 export async function createSubtask(taskId: string, title: string) {
   const { supabase, user } = await requireUser();
 
+  await assertTaskEditable(supabase, taskId);
+
   const { count } = await supabase
     .from("subtasks")
     .select("id", { count: "exact", head: true })
@@ -226,6 +250,14 @@ export async function createSubtask(taskId: string, title: string) {
  */
 export async function toggleSubtask(subtaskId: string, completed: boolean) {
   const { supabase } = await requireUser();
+
+  const { data: existing } = await supabase
+    .from("subtasks")
+    .select("task_id")
+    .eq("id", subtaskId)
+    .single();
+  if (!existing) throw new Error("Subtask not found");
+  await assertTaskEditable(supabase, existing.task_id);
 
   const { data: subtask, error } = await supabase
     .from("subtasks")
@@ -267,6 +299,12 @@ export async function toggleSubtask(subtaskId: string, completed: boolean) {
 
 export async function deleteSubtask(subtaskId: string) {
   const { supabase } = await requireUser();
+  const { data: existing } = await supabase
+    .from("subtasks")
+    .select("task_id")
+    .eq("id", subtaskId)
+    .single();
+  if (existing) await assertTaskEditable(supabase, existing.task_id);
   const { error } = await supabase.from("subtasks").delete().eq("id", subtaskId);
   if (error) throw new Error(error.message);
   revalidatePath("/today");

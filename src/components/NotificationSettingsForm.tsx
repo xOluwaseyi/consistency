@@ -12,15 +12,19 @@ function toSlotValue(time: string | null): Slot {
 }
 
 export function NotificationSettingsForm({ profile }: { profile: Profile }) {
-  const [times, setTimes] = useState<[Slot, Slot, Slot, Slot]>([
+  const initialTimes: [Slot, Slot, Slot, Slot] = [
     toSlotValue(profile.notify_time_1),
     toSlotValue(profile.notify_time_2),
     toSlotValue(profile.notify_time_3),
     toSlotValue(profile.notify_time_4),
-  ]);
+  ];
+  const [times, setTimes] = useState<[Slot, Slot, Slot, Slot]>(initialTimes);
   const [enabled, setEnabled] = useState(profile.notifications_enabled);
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
+
+  const hasChanges =
+    enabled !== profile.notifications_enabled || times.some((t, i) => t !== initialTimes[i]);
 
   function setSlot(index: number, value: string) {
     setTimes((prev) => {
@@ -93,7 +97,7 @@ export function NotificationSettingsForm({ profile }: { profile: Profile }) {
       <button
         type="button"
         onClick={handleSave}
-        disabled={pending}
+        disabled={pending || !hasChanges}
         className="w-full rounded-xl bg-accent-soft/50 py-2 text-xs font-medium text-foreground disabled:opacity-50"
       >
         {saved ? "Saved" : pending ? "Saving…" : "Save times"}

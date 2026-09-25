@@ -55,6 +55,7 @@ export default async function WeekPage({
           const key = toDateKey(date);
           const dayTasks = tasksByDate.get(key) ?? [];
           const isToday = key === today;
+          const isPast = key < today;
           const completed = dayTasks.filter((t) => t.completed).length;
 
           return (
@@ -101,7 +102,12 @@ export default async function WeekPage({
                     subtaskCounts={subtaskCounts.get(task.id)}
                   />
                 ))}
-                <NewTaskForm scheduledDate={key} />
+                {!isPast && <NewTaskForm scheduledDate={key} />}
+                {isPast && dayTasks.length === 0 && (
+                  <p className="py-2 text-center text-xs text-muted">
+                    This day has passed. Nothing was planned for it.
+                  </p>
+                )}
               </div>
             </details>
           );
