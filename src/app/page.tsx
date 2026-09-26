@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Smartphone, Monitor } from "lucide-react";
 import { FeatureAccordion } from "@/components/FeatureAccordion";
+import { LandingHeader } from "@/components/LandingHeader";
 
 function GithubMark(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -120,22 +122,29 @@ const STEPS = [
   { n: "3", title: "Keep the streak", body: "Finish everything and the day counts. Come back tomorrow and do it again." },
 ];
 
+const INSTALL_STEPS = [
+  {
+    icon: Smartphone,
+    platform: "Android",
+    body: "Open this page in Chrome, tap the menu (⋮), then \"Install app\".",
+  },
+  {
+    icon: Smartphone,
+    platform: "iPhone & iPad",
+    body: "Open this page in Safari, tap the Share icon, then \"Add to Home Screen\".",
+  },
+  {
+    icon: Monitor,
+    platform: "Desktop",
+    body: "Click the install icon in your browser's address bar, then \"Install\".",
+  },
+];
+
 export default function LandingPage() {
   return (
-    <main className="mx-auto w-full max-w-6xl px-6 pb-20 pt-[calc(env(safe-area-inset-top)+2rem)] sm:px-8 lg:px-12">
-      <header className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <Image src="/icons/icon-192.png" alt="" width={32} height={32} className="rounded-lg" />
-          <span className="text-sm font-semibold tracking-tight">Consistency</span>
-        </div>
-        <Link
-          href="/login"
-          className="rounded-full border border-border px-4 py-1.5 text-xs font-medium text-muted transition hover:border-accent hover:text-foreground"
-        >
-          Sign in
-        </Link>
-      </header>
-
+    <>
+    <LandingHeader />
+    <main className="mx-auto w-full max-w-6xl px-6 pb-20 sm:px-8 lg:px-12">
       <section className="mt-10 text-center sm:mt-14 lg:mt-16">
         <p className="mb-4 inline-block rounded-full border border-accent/30 bg-accent-soft/30 px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-accent">
           Built for one person: you
@@ -168,7 +177,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="mt-20 space-y-20 lg:mt-28 lg:space-y-28">
+      <section id="features" className="mt-20 scroll-mt-24 space-y-20 lg:mt-28 lg:space-y-28">
         {SHOWCASE.map(({ src, width, height, alt, eyebrow, title, body, points }, i) => (
           <div
             key={src}
@@ -207,7 +216,7 @@ export default function LandingPage() {
         ))}
       </section>
 
-      <section id="how-it-works" className="mt-24 scroll-mt-8 lg:mt-32">
+      <section id="how-it-works" className="mt-24 scroll-mt-24 lg:mt-32">
         <div className="grid gap-3 sm:grid-cols-3 lg:gap-6">
           {STEPS.map((step) => (
             <div key={step.n} className="rounded-2xl border border-border bg-surface p-5 lg:p-7">
@@ -216,6 +225,26 @@ export default function LandingPage() {
               </div>
               <p className="text-sm font-semibold lg:text-base">{step.title}</p>
               <p className="mt-1 text-sm text-muted lg:text-base">{step.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section id="install" className="mt-24 scroll-mt-24 lg:mt-32">
+        <h2 className="text-balance text-center text-2xl font-semibold tracking-tight lg:text-4xl">
+          Install it like an app
+        </h2>
+        <p className="mx-auto mt-2 max-w-md text-pretty text-center text-sm text-muted lg:mt-3 lg:max-w-lg lg:text-base">
+          No app store needed. Add Consistency to your home screen or dock for one-tap access.
+        </p>
+        <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:mt-10 lg:gap-6">
+          {INSTALL_STEPS.map(({ icon: Icon, platform, body }) => (
+            <div key={platform} className="rounded-2xl border border-border bg-surface p-5 lg:p-7">
+              <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-full bg-accent-soft/50 text-accent">
+                <Icon size={16} />
+              </div>
+              <p className="text-sm font-semibold lg:text-base">{platform}</p>
+              <p className="mt-1 text-sm text-muted lg:text-base">{body}</p>
             </div>
           ))}
         </div>
@@ -275,5 +304,6 @@ export default function LandingPage() {
         </div>
       </footer>
     </main>
+    </>
   );
 }
