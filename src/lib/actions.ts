@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { todayKey } from "@/lib/streak";
+import { todayKey, toDateKey } from "@/lib/streak";
+import { ACTIVITY_COLORS } from "@/lib/activity";
 import type { TaskPriority } from "@/lib/database.types";
 
 const MAX_FREEZES_PER_MONTH = 3;
@@ -36,7 +37,7 @@ export async function createTask(input: {
   title: string;
   why?: string;
   priority: TaskPriority;
-  repeatDaily?: boolean;
+  repeatDays?: number[];
   scheduledDate: string;
 }) {
   const { supabase, user } = await requireUser();
@@ -50,7 +51,7 @@ export async function createTask(input: {
     title: input.title.trim(),
     why: input.why?.trim() || null,
     priority: input.priority,
-    repeat_daily: input.repeatDaily ?? false,
+    repeat_days: [...new Set(input.repeatDays ?? [])].filter((d) => d >= 0 && d <= 6).sort(),
     scheduled_date: input.scheduledDate,
   });
 
@@ -60,43 +61,49 @@ export async function createTask(input: {
 }
 
 /**
- * Looks back (up to 30 days) for the most recent day that had tasks flagged
- * "repeat daily", and copies those into `targetDate` as fresh, incomplete
- * tasks — skipping any title already scheduled that day so it's safe to
- * press more than once.
+ * Looks back (up to 30 days) at repeating tasks and copies into `targetDate`
+ * every one whose latest copy is set to repeat on that weekday, as fresh,
+ * incomplete tasks. Skips any title already scheduled that day, so it's safe
+ * to press more than once.
  */
 export async function copyRecurringTasks(targetDate: string): Promise<number> {
   const { supabase, user } = await requireUser();
 
-  const since = new Date(`${targetDate}T00:00:00`);
+  const target = new Date(`${targetDate}T00:00:00`);
+  const weekday = target.getDay();
+  const since = new Date(target);
   since.setDate(since.getDate() - 30);
-  const sinceKey = since.toISOString().slice(0, 10);
+  const sinceKey = toDateKey(since);
 
-  const [{ data: candidates }, { data: existing }] = await Promise.all([
+  const [{ data: recent }, { data: existing }] = await Promise.all([
     supabase
       .from("tasks")
-      .select("title, why, priority, scheduled_date")
+      .select("title, why, priority, repeat_days, scheduled_date, created_at")
       .eq("user_id", user.id)
-      .eq("repeat_daily", true)
       .lt("scheduled_date", targetDate)
       .gte("scheduled_date", sinceKey)
-      .order("scheduled_date", { ascending: false }),
+      .order("scheduled_date", { ascending: false })
+      .order("created_at", { ascending: false }),
     supabase.from("tasks").select("title").eq("user_id", user.id).eq("scheduled_date", targetDate),
   ]);
 
-  if (!candidates || candidates.length === 0) return 0;
+  // The newest copy of each title decides its schedule, so changing the days
+  // (by adding the task again with new days) takes over from older copies.
+  const latestByTitle = new Map<string, NonNullable<typeof recent>[number]>();
+  for (const task of recent ?? []) {
+    if (!latestByTitle.has(task.title)) latestByTitle.set(task.title, task);
+  }
 
   const existingTitles = new Set((existing ?? []).map((t) => t.title));
-  const mostRecentDate = candidates[0].scheduled_date;
 
-  const toInsert = candidates
-    .filter((t) => t.scheduled_date === mostRecentDate && !existingTitles.has(t.title))
+  const toInsert = [...latestByTitle.values()]
+    .filter((t) => t.repeat_days.includes(weekday) && !existingTitles.has(t.title))
     .map((t) => ({
       user_id: user.id,
       title: t.title,
       why: t.why,
       priority: t.priority,
-      repeat_daily: true,
+      repeat_days: t.repeat_days,
       scheduled_date: targetDate,
     }));
 
@@ -374,6 +381,122 @@ export async function updateNotificationSettings(input: {
     .eq("id", user.id);
   if (error) throw new Error(error.message);
   revalidatePath("/settings");
+}
+
+function revalidateActivity() {
+  revalidatePath("/today");
+  revalidatePath("/overview");
+}
+
+async function assertOwnCategory(supabase: SupabaseServerClient, userId: string, categoryId: string) {
+  const { data } = await supabase
+    .from("activity_categories")
+    .select("id")
+    .eq("id", categoryId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!data) throw new Error("That category doesn't exist anymore.");
+}
+
+/** Starting an activity stops whatever was running, so there's only ever one. */
+export async function startActivity(categoryId: string) {
+  const { supabase, user } = await requireUser();
+  await assertOwnCategory(supabase, user.id, categoryId);
+  const now = new Date().toISOString();
+
+  const { error: stopError } = await supabase
+    .from("activity_entries")
+    .update({ ended_at: now })
+    .eq("user_id", user.id)
+    .is("ended_at", null);
+  if (stopError) throw new Error(stopError.message);
+
+  const { error } = await supabase
+    .from("activity_entries")
+    .insert({ user_id: user.id, category_id: categoryId, started_at: now });
+  if (error) throw new Error(error.message);
+
+  revalidateActivity();
+}
+
+export async function stopActivity() {
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase
+    .from("activity_entries")
+    .update({ ended_at: new Date().toISOString() })
+    .eq("user_id", user.id)
+    .is("ended_at", null);
+  if (error) throw new Error(error.message);
+  revalidateActivity();
+}
+
+function validateEntryTimes(startedAt: string, endedAt: string) {
+  const start = new Date(startedAt).getTime();
+  const end = new Date(endedAt).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end)) throw new Error("Those times don't look right.");
+  if (end <= start) throw new Error("The end time has to be after the start time.");
+  if (end > Date.now() + 60_000) throw new Error("You can't log time that hasn't happened yet.");
+}
+
+export async function saveActivityEntry(input: {
+  id?: string;
+  categoryId: string;
+  startedAt: string;
+  endedAt: string;
+}) {
+  const { supabase, user } = await requireUser();
+  validateEntryTimes(input.startedAt, input.endedAt);
+  await assertOwnCategory(supabase, user.id, input.categoryId);
+
+  const values = {
+    category_id: input.categoryId,
+    started_at: input.startedAt,
+    ended_at: input.endedAt,
+  };
+
+  const { error } = input.id
+    ? await supabase.from("activity_entries").update(values).eq("id", input.id).eq("user_id", user.id)
+    : await supabase.from("activity_entries").insert({ ...values, user_id: user.id });
+  if (error) throw new Error(error.message);
+
+  revalidateActivity();
+}
+
+export async function deleteActivityEntry(entryId: string) {
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase
+    .from("activity_entries")
+    .delete()
+    .eq("id", entryId)
+    .eq("user_id", user.id);
+  if (error) throw new Error(error.message);
+  revalidateActivity();
+}
+
+export async function createActivityCategory(name: string, color: string) {
+  const { supabase, user } = await requireUser();
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Give the category a name.");
+  if (!(ACTIVITY_COLORS as readonly string[]).includes(color)) throw new Error("Pick one of the colours.");
+
+  const { error } = await supabase
+    .from("activity_categories")
+    .insert({ user_id: user.id, name: trimmed, color });
+  if (error) {
+    throw new Error(error.code === "23505" ? "You already have a category with that name." : error.message);
+  }
+  revalidateActivity();
+}
+
+export async function deleteActivityCategory(categoryId: string) {
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase
+    .from("activity_categories")
+    .delete()
+    .eq("id", categoryId)
+    .eq("user_id", user.id);
+  if (error) throw new Error(error.message);
+  revalidateActivity();
 }
 
 export async function signOut() {

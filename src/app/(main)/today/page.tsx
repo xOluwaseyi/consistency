@@ -4,6 +4,8 @@ import {
   getOpenSessionsForTasks,
   getSessionDurationsForTasks,
   getSubtaskCountsForTasks,
+  getActivityCategories,
+  getActivityEntries,
 } from "@/lib/data";
 import { todayKey } from "@/lib/streak";
 import { StreakBanner } from "@/components/StreakBanner";
@@ -12,12 +14,18 @@ import { NewTaskForm } from "@/components/NewTaskForm";
 import { DistractionButton } from "@/components/DistractionButton";
 import { FreezeButton } from "@/components/FreezeButton";
 import { RolloverButton } from "@/components/RolloverButton";
+import { ActivityTracker } from "@/components/ActivityTracker";
 
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
   const today = todayKey();
-  const [tasks, streakCtx] = await Promise.all([getTasksForDate(today), getStreakContext()]);
+  const [tasks, streakCtx, activityCategories, activityEntries] = await Promise.all([
+    getTasksForDate(today),
+    getStreakContext(),
+    getActivityCategories(),
+    getActivityEntries(2),
+  ]);
   const taskIds = tasks.map((t) => t.id);
   const [openSessions, durations, subtaskCounts] = await Promise.all([
     getOpenSessionsForTasks(taskIds),
@@ -84,6 +92,7 @@ export default async function TodayPage() {
 
       <NewTaskForm scheduledDate={today} />
       <RolloverButton date={today} />
+      <ActivityTracker categories={activityCategories} entries={activityEntries} />
       <DistractionButton />
     </div>
   );

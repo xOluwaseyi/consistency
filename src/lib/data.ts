@@ -136,6 +136,55 @@ export async function getSessionDurationsForTasks(taskIds: string[]) {
   return totals;
 }
 
+export async function getActivityCategories() {
+  const supabase = await createClient();
+  const user = await getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from("activity_categories")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true });
+
+  return data ?? [];
+}
+
+/** Whole ISO seconds, so the value is safe inside a PostgREST `or()` filter. */
+function isoDaysAgo(days: number) {
+  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 19) + "Z";
+}
+
+/** Entries started in the last `daysBack` days, plus any still running. */
+export async function getActivityEntries(daysBack: number) {
+  const supabase = await createClient();
+  const user = await getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from("activity_entries")
+    .select("*")
+    .eq("user_id", user.id)
+    .or(`started_at.gte.${isoDaysAgo(daysBack)},ended_at.is.null`)
+    .order("started_at", { ascending: false });
+
+  return data ?? [];
+}
+
+export async function getTaskSessions(daysBack: number) {
+  const supabase = await createClient();
+  const user = await getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from("task_sessions")
+    .select("started_at, ended_at")
+    .eq("user_id", user.id)
+    .or(`started_at.gte.${isoDaysAgo(daysBack)},ended_at.is.null`);
+
+  return data ?? [];
+}
+
 export async function getSubtaskCountsForTasks(taskIds: string[]) {
   if (taskIds.length === 0) return new Map<string, { total: number; completed: number }>();
   const supabase = await createClient();

@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { Plus, X, Repeat } from "lucide-react";
 import { createTask } from "@/lib/actions";
 import { cn } from "@/lib/utils";
+import { WEEKDAYS, formatRepeatDays } from "@/lib/date";
 import type { TaskPriority } from "@/lib/database.types";
 
 const PRIORITIES: { value: TaskPriority; label: string; dot: string }[] = [
@@ -17,7 +18,7 @@ export function NewTaskForm({ scheduledDate }: { scheduledDate: string }) {
   const [title, setTitle] = useState("");
   const [why, setWhy] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("medium");
-  const [repeatDaily, setRepeatDaily] = useState(false);
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
   const [pending, startTransition] = useTransition();
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -25,15 +26,19 @@ export function NewTaskForm({ scheduledDate }: { scheduledDate: string }) {
     setTitle("");
     setWhy("");
     setPriority("medium");
-    setRepeatDaily(false);
+    setRepeatDays([]);
     setOpen(false);
+  }
+
+  function toggleDay(day: number) {
+    setRepeatDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
     startTransition(async () => {
-      await createTask({ title, why, priority, repeatDaily, scheduledDate });
+      await createTask({ title, why, priority, repeatDays, scheduledDate });
       reset();
     });
   }
@@ -102,15 +107,42 @@ export function NewTaskForm({ scheduledDate }: { scheduledDate: string }) {
         ))}
       </div>
 
-      <label className="flex items-center gap-1.5 text-[11px] text-muted">
-        <input
-          type="checkbox"
-          checked={repeatDaily}
-          onChange={(e) => setRepeatDaily(e.target.checked)}
-          className="h-3.5 w-3.5 rounded accent-accent"
-        />
-        <Repeat size={11} /> Repeat daily
-      </label>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <p className="flex items-center gap-1.5 text-[11px] text-muted">
+            <Repeat size={11} /> {formatRepeatDays(repeatDays)}
+          </p>
+          <button
+            type="button"
+            onClick={() => setRepeatDays(repeatDays.length === 7 ? [] : WEEKDAYS.map((d) => d.value))}
+            className="text-[11px] font-medium text-accent"
+          >
+            {repeatDays.length === 7 ? "Clear" : "Every day"}
+          </button>
+        </div>
+        <div className="flex gap-1.5">
+          {WEEKDAYS.map((day) => {
+            const selected = repeatDays.includes(day.value);
+            return (
+              <button
+                key={day.value}
+                type="button"
+                onClick={() => toggleDay(day.value)}
+                aria-pressed={selected}
+                aria-label={day.name}
+                className={cn(
+                  "flex h-8 flex-1 items-center justify-center rounded-lg border text-[11px] font-medium transition",
+                  selected
+                    ? "border-accent bg-accent-soft/40 text-foreground"
+                    : "border-border text-muted",
+                )}
+              >
+                {day.short}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <button
         type="submit"

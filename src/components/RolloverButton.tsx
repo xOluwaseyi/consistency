@@ -32,7 +32,7 @@ export function RolloverButton({ date }: { date: string }) {
         >
           <Repeat size={14} /> {pending ? "Bringing over…" : "Bring over repeating tasks"}
         </button>
-        <InfoTooltip text="Looks back up to 30 days for the most recent day that had tasks marked “repeat daily,” and adds them to today as fresh, unchecked tasks. Safe to press more than once: it skips anything already on today's list." />
+        <InfoTooltip text="Adds every task set to repeat on today's weekday (from the last 30 days) to today as fresh, unchecked tasks. Safe to press more than once: it skips anything already on today's list." />
       </div>
 
       {result && <p className="mt-1.5 text-center text-[11px] text-muted">{result}</p>}

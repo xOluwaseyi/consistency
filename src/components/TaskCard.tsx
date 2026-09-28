@@ -8,6 +8,7 @@ import { TaskDetailModal } from "@/components/TaskDetailModal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { cn, formatClock } from "@/lib/utils";
 import { todayKey } from "@/lib/streak";
+import { formatRepeatDays } from "@/lib/date";
 import type { Task } from "@/lib/database.types";
 
 const PRIORITY_STYLES: Record<Task["priority"], string> = {
@@ -93,8 +94,12 @@ export function TaskCard({
               <p className={cn("truncate text-sm font-medium", completed && "line-through")}>
                 {task.title}
               </p>
-              {task.repeat_daily && (
-                <Repeat size={12} className="shrink-0 text-muted" aria-label="Repeats daily" />
+              {task.repeat_days.length > 0 && (
+                <Repeat
+                  size={12}
+                  className="shrink-0 text-muted"
+                  aria-label={formatRepeatDays(task.repeat_days)}
+                />
               )}
               {task.why && (
                 <button

@@ -4,12 +4,16 @@ import {
   getSessionDurationsForTasks,
   getDistractionsSince,
   getReflection,
+  getActivityCategories,
+  getActivityEntries,
+  getTaskSessions,
 } from "@/lib/data";
 import { toDateKey } from "@/lib/streak";
 import { todayKey } from "@/lib/streak";
 import { Heatmap } from "@/components/Heatmap";
 import { HoursChart } from "@/components/HoursChart";
 import { ReflectionBox } from "@/components/ReflectionBox";
+import { DayBreakdown } from "@/components/DayBreakdown";
 import { formatDuration } from "@/lib/utils";
 import { Flame, Trophy, Target, Smartphone } from "lucide-react";
 
@@ -21,12 +25,17 @@ export default async function OverviewPage() {
   weekStart.setDate(weekStart.getDate() - 6);
   const weekStartKey = toDateKey(weekStart);
 
-  const [streakCtx, weekTasks, distractions, reflection] = await Promise.all([
-    getStreakContext(),
-    getTasksForRange(weekStartKey, today),
-    getDistractionsSince(weekStartKey),
-    getReflection(today),
-  ]);
+  // 8 days of activity so the oldest local day in the 7-day picker is fully covered in any timezone.
+  const [streakCtx, weekTasks, distractions, reflection, activityCategories, activityEntries, taskSessions] =
+    await Promise.all([
+      getStreakContext(),
+      getTasksForRange(weekStartKey, today),
+      getDistractionsSince(weekStartKey),
+      getReflection(today),
+      getActivityCategories(),
+      getActivityEntries(8),
+      getTaskSessions(8),
+    ]);
 
   const durations = await getSessionDurationsForTasks(weekTasks.map((t) => t.id));
 
@@ -70,6 +79,8 @@ export default async function OverviewPage() {
         <StatCard icon={Trophy} label="Best" value={`${streakCtx.longest}d`} />
         <StatCard icon={Target} label="Completion" value={`${completionRate}%`} />
       </div>
+
+      <DayBreakdown categories={activityCategories} entries={activityEntries} sessions={taskSessions} />
 
       <div className="rounded-2xl border border-border bg-surface p-3.5">
         <div className="mb-2 flex items-center justify-between">

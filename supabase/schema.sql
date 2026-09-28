@@ -24,6 +24,7 @@ create table if not exists tasks (
   priority task_priority not null default 'medium',
   track_time boolean not null default false,
   repeat_daily boolean not null default false,
+  repeat_days smallint[] not null default '{}', -- 0 = Sunday ... 6 = Saturday
   scheduled_date date not null,
   completed boolean not null default false,
   completed_at timestamptz,
@@ -102,6 +103,26 @@ create table if not exists sent_reminders (
 
 create index if not exists sent_reminders_lookup_idx on sent_reminders (user_id, slot, date);
 
+create table if not exists activity_categories (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  name text not null,
+  color text not null,
+  created_at timestamptz not null default now(),
+  unique (user_id, name)
+);
+
+create table if not exists activity_entries (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  category_id uuid not null references activity_categories (id) on delete cascade,
+  started_at timestamptz not null,
+  ended_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists activity_entries_user_started_idx on activity_entries (user_id, started_at);
+
 -- Row Level Security: every table is scoped to auth.uid().
 alter table profiles enable row level security;
 alter table tasks enable row level security;
@@ -112,6 +133,8 @@ alter table reflections enable row level security;
 alter table push_subscriptions enable row level security;
 alter table subtasks enable row level security;
 alter table sent_reminders enable row level security;
+alter table activity_categories enable row level security;
+alter table activity_entries enable row level security;
 
 create policy "own profile" on profiles for all using (auth.uid() = id) with check (auth.uid() = id);
 create policy "own tasks" on tasks for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
@@ -122,13 +145,16 @@ create policy "own reflections" on reflections for all using (auth.uid() = user_
 create policy "own push subs" on push_subscriptions for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own subtasks" on subtasks for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own sent reminders" on sent_reminders for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own activity categories" on activity_categories for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own activity entries" on activity_entries for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- Table-level grants for the Data API (PostgREST). Needed if your project has
 -- "Automatically expose new tables" turned off — RLS above still restricts
 -- every row to its owner regardless of these grants.
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on
-  profiles, tasks, task_sessions, streak_freezes, distractions, reflections, push_subscriptions, subtasks
+  profiles, tasks, task_sessions, streak_freezes, distractions, reflections, push_subscriptions, subtasks,
+  activity_categories, activity_entries
   to authenticated;
 
 -- The service role (used server-side by the notification poller, bypassing
@@ -136,10 +162,11 @@ grant select, insert, update, delete on
 -- off — it isn't exempted from that setting despite being an admin-style key.
 grant usage on schema public to service_role;
 grant select, insert, update, delete on
-  profiles, tasks, task_sessions, streak_freezes, distractions, reflections, push_subscriptions, subtasks, sent_reminders
+  profiles, tasks, task_sessions, streak_freezes, distractions, reflections, push_subscriptions, subtasks, sent_reminders,
+  activity_categories, activity_entries
   to service_role;
 
--- Auto-create a profile row whenever a new auth user signs up.
+-- Auto-create a profile row and starter activity categories whenever a new auth user signs up.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -147,6 +174,13 @@ security definer set search_path = public
 as $$
 begin
   insert into public.profiles (id) values (new.id);
+  insert into public.activity_categories (user_id, name, color) values
+    (new.id, 'Work', '#3987e5'),
+    (new.id, 'Sleep', '#199e70'),
+    (new.id, 'Exercise', '#008300'),
+    (new.id, 'Commute', '#c98500'),
+    (new.id, 'Social media', '#d55181'),
+    (new.id, 'Rest', '#d95926');
   return new;
 end;
 $$;

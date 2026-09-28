@@ -33,6 +33,7 @@ export interface Database {
           priority: TaskPriority;
           track_time: boolean;
           repeat_daily: boolean;
+          repeat_days: number[];
           scheduled_date: string;
           completed: boolean;
           completed_at: string | null;
@@ -150,6 +151,37 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["sent_reminders"]["Row"]>;
       } & NoRelationships;
+      activity_categories: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          color: string;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["activity_categories"]["Row"]> & {
+          user_id: string;
+          name: string;
+          color: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["activity_categories"]["Row"]>;
+      } & NoRelationships;
+      activity_entries: {
+        Row: {
+          id: string;
+          user_id: string;
+          category_id: string;
+          started_at: string;
+          ended_at: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["activity_entries"]["Row"]> & {
+          user_id: string;
+          category_id: string;
+          started_at: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["activity_entries"]["Row"]>;
+      } & NoRelationships;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -162,3 +194,5 @@ export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Reflection = Database["public"]["Tables"]["reflections"]["Row"];
 export type Distraction = Database["public"]["Tables"]["distractions"]["Row"];
 export type Subtask = Database["public"]["Tables"]["subtasks"]["Row"];
+export type ActivityCategory = Database["public"]["Tables"]["activity_categories"]["Row"];
+export type ActivityEntry = Database["public"]["Tables"]["activity_entries"]["Row"];
