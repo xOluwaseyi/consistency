@@ -1,5 +1,6 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { computeStreakContext } from "@/lib/streak";
+import { computeStreakContext, todayKey } from "@/lib/streak";
 import type { Task, Profile } from "@/lib/database.types";
 
 export async function getUser() {
@@ -10,22 +11,28 @@ export async function getUser() {
   return user;
 }
 
-export async function getProfile(): Promise<Profile | null> {
+export const getProfile = cache(async (): Promise<Profile | null> => {
   const supabase = await createClient();
   const user = await getUser();
   if (!user) return null;
 
   const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   return data;
+});
+
+/** Today's date key in the signed-in user's timezone. */
+export async function getToday() {
+  const profile = await getProfile();
+  return todayKey(profile?.timezone ?? "UTC");
 }
 
 /** Tasks + freeze dates for the last `daysBack` days through today, used for streak math. */
-export async function getStreakContext(daysBack = 400) {
+export async function getStreakContext(today: string, daysBack = 400) {
   const supabase = await createClient();
   const user = await getUser();
   if (!user) return { streak: 0, longest: 0, freezesThisMonth: 0, days: new Map() };
 
-  return computeStreakContext(supabase, user.id, daysBack);
+  return computeStreakContext(supabase, user.id, today, daysBack);
 }
 
 export async function getTasksForDate(date: string): Promise<Task[]> {

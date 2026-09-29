@@ -11,9 +11,16 @@ function cellColor(day: DaySummary | undefined): string {
   return "bg-danger/60";
 }
 
-export function Heatmap({ days, weeks = 12 }: { days: Map<string, DaySummary>; weeks?: number }) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+export function Heatmap({
+  days,
+  today: todayKey,
+  weeks = 12,
+}: {
+  days: Map<string, DaySummary>;
+  today: string;
+  weeks?: number;
+}) {
+  const today = new Date(`${todayKey}T00:00:00`);
   const dayOfWeek = today.getDay();
   const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
   const thisMonday = new Date(today);

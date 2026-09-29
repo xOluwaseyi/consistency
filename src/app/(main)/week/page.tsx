@@ -3,9 +3,9 @@ import {
   getSessionDurationsForTasks,
   getOpenSessionsForTasks,
   getSubtaskCountsForTasks,
+  getToday,
 } from "@/lib/data";
 import { getWeekDays, formatWeekRange, toDateKey } from "@/lib/date";
-import { todayKey } from "@/lib/streak";
 import { WeekNav } from "@/components/WeekNav";
 import { TaskCard } from "@/components/TaskCard";
 import { NewTaskForm } from "@/components/NewTaskForm";
@@ -20,8 +20,8 @@ export default async function WeekPage({
 }) {
   const { week } = await searchParams;
   const offset = Number.isFinite(Number(week)) ? Number(week) : 0;
-  const days = getWeekDays(offset);
-  const today = todayKey();
+  const today = await getToday();
+  const days = getWeekDays(offset, today);
 
   const startKey = toDateKey(days[0]);
   const endKey = toDateKey(days[6]);
@@ -90,6 +90,7 @@ export default async function WeekPage({
                   <TaskCard
                     key={task.id}
                     task={task}
+                    today={today}
                     openSession={
                       openByTask.get(task.id)
                         ? {

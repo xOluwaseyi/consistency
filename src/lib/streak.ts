@@ -119,19 +119,26 @@ export function toDateKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-export function todayKey(): string {
-  return toDateKey(new Date());
+/** Today's date (yyyy-mm-dd) in the user's timezone. The server itself runs in UTC. */
+export function todayKey(timezone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date());
+}
+
+/** Calendar arithmetic on a yyyy-mm-dd key. */
+export function addDays(dateKey: string, days: number): string {
+  const date = new Date(`${dateKey}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return toDateKey(date);
 }
 
 /** Shared by the session-bound server client (app pages) and the admin client (cron). */
 export async function computeStreakContext(
   supabase: SupabaseClient<Database>,
   userId: string,
+  today: string,
   daysBack = 400,
 ) {
-  const since = new Date();
-  since.setDate(since.getDate() - daysBack);
-  const sinceKey = toDateKey(since);
+  const sinceKey = addDays(today, -daysBack);
 
   const [{ data: tasks }, { data: freezes }] = await Promise.all([
     supabase.from("tasks").select("*").eq("user_id", userId).gte("scheduled_date", sinceKey),
@@ -144,7 +151,6 @@ export async function computeStreakContext(
 
   const freezeDates = new Set((freezes ?? []).map((f) => f.date_used));
   const days = summarizeDays((tasks ?? []) as Task[], freezeDates);
-  const today = todayKey();
   const monthStart = `${today.slice(0, 7)}-01`;
   const freezesThisMonth = [...freezeDates].filter((d) => d >= monthStart).length;
 

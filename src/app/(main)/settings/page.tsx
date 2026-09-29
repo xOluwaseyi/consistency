@@ -1,4 +1,4 @@
-import { getProfile, getStreakContext, getUser } from "@/lib/data";
+import { getProfile, getStreakContext, getToday, getUser } from "@/lib/data";
 import { PushSubscribeButton } from "@/components/PushSubscribeButton";
 import { NotificationSettingsForm } from "@/components/NotificationSettingsForm";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -7,9 +7,10 @@ import { Snowflake } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
+  const today = await getToday();
   const [profile, streakCtx, user] = await Promise.all([
     getProfile(),
-    getStreakContext(),
+    getStreakContext(today),
     getUser(),
   ]);
 

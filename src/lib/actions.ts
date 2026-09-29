@@ -21,15 +21,20 @@ async function requireUser() {
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
+async function userToday(supabase: SupabaseServerClient, userId: string) {
+  const { data: profile } = await supabase.from("profiles").select("timezone").eq("id", userId).single();
+  return todayKey(profile?.timezone ?? "UTC");
+}
+
 /** Past days are locked: no editing, completing, timing, or deleting. */
 async function assertTaskEditable(supabase: SupabaseServerClient, taskId: string) {
   const { data: task } = await supabase
     .from("tasks")
-    .select("scheduled_date")
+    .select("scheduled_date, user_id")
     .eq("id", taskId)
     .single();
 
-  if (task && task.scheduled_date < todayKey()) {
+  if (task && task.scheduled_date < (await userToday(supabase, task.user_id))) {
     throw new Error("This task is from a past day and can no longer be changed.");
   }
 }
@@ -43,7 +48,7 @@ export async function createTask(input: {
 }) {
   const { supabase, user } = await requireUser();
 
-  if (input.scheduledDate < todayKey()) {
+  if (input.scheduledDate < (await userToday(supabase, user.id))) {
     throw new Error("Can't add a task to a day that's already passed.");
   }
 
@@ -536,6 +541,17 @@ export async function deleteActivityCategory(categoryId: string) {
     .eq("user_id", user.id);
   if (error) throw new Error(error.message);
   revalidateActivity();
+}
+
+export async function syncTimezone(timezone: string) {
+  const { supabase, user } = await requireUser();
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+  } catch {
+    throw new Error("Unknown timezone.");
+  }
+  const { error } = await supabase.from("profiles").update({ timezone }).eq("id", user.id);
+  if (error) throw new Error(error.message);
 }
 
 export async function signOut() {

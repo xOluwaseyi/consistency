@@ -7,7 +7,6 @@ import { TimerControl } from "@/components/TimerControl";
 import { TaskDetailModal } from "@/components/TaskDetailModal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { cn, formatClock } from "@/lib/utils";
-import { todayKey } from "@/lib/streak";
 import { formatRepeatDays } from "@/lib/date";
 import type { Task } from "@/lib/database.types";
 
@@ -19,11 +18,13 @@ const PRIORITY_STYLES: Record<Task["priority"], string> = {
 
 export function TaskCard({
   task,
+  today,
   openSession,
   totalSeconds,
   subtaskCounts,
 }: {
   task: Task;
+  today: string;
   openSession: { id: string; started_at: string } | null;
   totalSeconds: number;
   subtaskCounts?: { total: number; completed: number };
@@ -35,7 +36,7 @@ export function TaskCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [completed, setCompleted] = useOptimistic(task.completed);
 
-  const locked = task.scheduled_date < todayKey();
+  const locked = task.scheduled_date < today;
   const canComplete = !subtaskCounts || subtaskCounts.total === 0 || subtaskCounts.completed === subtaskCounts.total;
 
   function handleToggle(e: React.MouseEvent) {

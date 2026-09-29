@@ -130,7 +130,7 @@ export async function pollAndSendReminders(): Promise<{
       const remaining = tasks.filter((t) => !t.completed).length;
       if (remaining === 0) continue; // already done, try again next poll (in case more get added)
 
-      const { streak } = await computeStreakContext(supabase, profile.id);
+      const { streak } = await computeStreakContext(supabase, profile.id, today);
       const body =
         remaining === 1
           ? `1 task left today.${streak > 0 ? ` Keep the ${streak}-day streak alive.` : ""}`

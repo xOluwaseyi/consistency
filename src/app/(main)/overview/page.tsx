@@ -7,9 +7,9 @@ import {
   getActivityCategories,
   getActivityEntries,
   getTaskSessions,
+  getToday,
 } from "@/lib/data";
-import { toDateKey } from "@/lib/streak";
-import { todayKey } from "@/lib/streak";
+import { addDays } from "@/lib/streak";
 import { Heatmap } from "@/components/Heatmap";
 import { HoursChart } from "@/components/HoursChart";
 import { ReflectionBox } from "@/components/ReflectionBox";
@@ -20,15 +20,13 @@ import { Flame, Trophy, Target, Smartphone } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
-  const today = todayKey();
-  const weekStart = new Date();
-  weekStart.setDate(weekStart.getDate() - 6);
-  const weekStartKey = toDateKey(weekStart);
+  const today = await getToday();
+  const weekStartKey = addDays(today, -6);
 
   // 8 days of activity so the oldest local day in the 7-day picker is fully covered in any timezone.
   const [streakCtx, weekTasks, distractions, reflection, activityCategories, activityEntries, taskSessions] =
     await Promise.all([
-      getStreakContext(),
+      getStreakContext(today),
       getTasksForRange(weekStartKey, today),
       getDistractionsSince(weekStartKey),
       getReflection(today),
@@ -39,11 +37,7 @@ export default async function OverviewPage() {
 
   const durations = await getSessionDurationsForTasks(weekTasks.map((t) => t.id));
 
-  const last7 = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    return toDateKey(d);
-  });
+  const last7 = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
 
   const hoursData = last7.map((dateKey) => {
     const dayTasks = weekTasks.filter((t) => t.scheduled_date === dateKey);
@@ -92,7 +86,7 @@ export default async function OverviewPage() {
 
       <div className="rounded-2xl border border-border bg-surface p-3.5">
         <p className="mb-3 text-xs font-medium text-muted">Last 12 weeks</p>
-        <Heatmap days={streakCtx.days} />
+        <Heatmap days={streakCtx.days} today={today} />
         <div className="mt-2 flex items-center gap-3 text-[10px] text-muted">
           <LegendDot className="bg-success" label="Done" />
           <LegendDot className="bg-priority-low" label="Frozen" />

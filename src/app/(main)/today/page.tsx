@@ -6,8 +6,8 @@ import {
   getSubtaskCountsForTasks,
   getActivityCategories,
   getActivityEntries,
+  getToday,
 } from "@/lib/data";
-import { todayKey } from "@/lib/streak";
 import { StreakBanner } from "@/components/StreakBanner";
 import { TaskCard } from "@/components/TaskCard";
 import { NewTaskForm } from "@/components/NewTaskForm";
@@ -19,10 +19,10 @@ import { ActivityTracker } from "@/components/ActivityTracker";
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
-  const today = todayKey();
+  const today = await getToday();
   const [tasks, streakCtx, activityCategories, activityEntries] = await Promise.all([
     getTasksForDate(today),
-    getStreakContext(),
+    getStreakContext(today),
     getActivityCategories(),
     getActivityEntries(2),
   ]);
@@ -83,6 +83,7 @@ export default async function TodayPage() {
           <TaskCard
             key={task.id}
             task={task}
+            today={today}
             openSession={openByTask.get(task.id) ? { id: openByTask.get(task.id)!.id, started_at: openByTask.get(task.id)!.started_at } : null}
             totalSeconds={durations.get(task.id) ?? 0}
             subtaskCounts={subtaskCounts.get(task.id)}

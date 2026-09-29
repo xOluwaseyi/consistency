@@ -1,8 +1,8 @@
 import { toDateKey } from "@/lib/streak";
 
-/** Monday-start week, offset in whole weeks from the current one. */
-export function getWeekDays(offset: number): Date[] {
-  const now = new Date();
+/** Monday-start week, offset in whole weeks from the one containing `today` (yyyy-mm-dd). */
+export function getWeekDays(offset: number, today: string): Date[] {
+  const now = new Date(`${today}T00:00:00`);
   const day = now.getDay(); // 0 = Sunday
   const diffToMonday = day === 0 ? -6 : 1 - day;
 
