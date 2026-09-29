@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, Play, Pause, Check, Plus, Trash2, Lock } from "lucide-react";
+import { X, Play, Pause, Check, Plus, Trash2, Lock, Square } from "lucide-react";
 import {
   getTaskDetail,
   toggleTaskComplete,
@@ -36,6 +36,7 @@ export function TaskDetailModal({
   const [completeError, setCompleteError] = useState<string | null>(null);
   const [newSubtask, setNewSubtask] = useState("");
   const [liveTick, setLiveTick] = useState(0);
+  const [stopping, setStopping] = useState(false);
   const pendingStartRef = useRef<Promise<string> | null>(null);
 
   useEffect(() => {
@@ -97,6 +98,20 @@ export function TaskDetailModal({
     );
     const realId = pendingStartRef.current ? await pendingStartRef.current : open.id;
     if (!realId.startsWith("temp-")) await stopTimerSession(realId);
+  }
+
+  async function handleStopLocked() {
+    if (!openSession) return;
+    setStopping(true);
+    setCompleteError(null);
+    try {
+      await stopTimerSession(openSession.id);
+      const { sessions } = await getTaskDetail(task.id);
+      setSessions(sessions);
+    } catch (e) {
+      setCompleteError(e instanceof Error ? e.message : "Something went wrong.");
+    }
+    setStopping(false);
   }
 
   async function handleToggleComplete() {
@@ -226,6 +241,16 @@ export function TaskDetailModal({
                 <p className="font-mono text-xl tabular-nums">{formatClock(totalSeconds)}</p>
               )}
             </div>
+            {locked && openSession && !openSession.id.startsWith("temp-") && (
+              <button
+                type="button"
+                onClick={handleStopLocked}
+                disabled={stopping}
+                className="flex items-center gap-1.5 rounded-full bg-danger/15 px-3 py-2 text-xs font-medium text-danger transition active:scale-95 disabled:opacity-50"
+              >
+                <Square size={11} fill="currentColor" /> {stopping ? "Stopping…" : "Stop timer"}
+              </button>
+            )}
             {!locked && (
               <button
                 type="button"

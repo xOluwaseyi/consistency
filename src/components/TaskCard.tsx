@@ -1,7 +1,7 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
-import { Check, Info, Trash2, Lock, Repeat, ListChecks } from "lucide-react";
+import { Check, Info, Trash2, Lock, Repeat, ListChecks, Square } from "lucide-react";
 import { toggleTaskComplete, deleteTask, stopTimerSession } from "@/lib/actions";
 import { TimerControl } from "@/components/TimerControl";
 import { TaskDetailModal } from "@/components/TaskDetailModal";
@@ -132,9 +132,31 @@ export function TaskCard({
                 </span>
               )}
               {locked ? (
-                <span className="font-mono text-xs text-muted tabular-nums">
-                  {formatClock(totalSeconds)}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs text-muted tabular-nums">
+                    {formatClock(totalSeconds)}
+                  </span>
+                  {openSession && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setError(null);
+                        startTransition(async () => {
+                          try {
+                            await stopTimerSession(openSession.id);
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : "Something went wrong");
+                          }
+                        });
+                      }}
+                      disabled={pending}
+                      className="flex items-center gap-1 rounded-full bg-danger/15 px-2 py-0.5 text-[10px] font-medium text-danger transition active:scale-95 disabled:opacity-50"
+                    >
+                      <Square size={8} fill="currentColor" /> Stop timer
+                    </button>
+                  )}
+                </div>
               ) : (
                 <div onClick={(e) => e.stopPropagation()}>
                   <TimerControl taskId={task.id} openSession={openSession} totalSeconds={totalSeconds} />

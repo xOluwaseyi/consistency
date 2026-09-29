@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { todayKey, toDateKey } from "@/lib/streak";
 import { ACTIVITY_COLORS } from "@/lib/activity";
+import { endOfDayInTimezone } from "@/lib/date";
 import type { TaskPriority } from "@/lib/database.types";
 
 const MAX_FREEZES_PER_MONTH = 3;
@@ -145,17 +146,38 @@ async function assertCanComplete(supabase: SupabaseServerClient, taskId: string)
   }
 }
 
+/** Ends every running timer on a task at `endedAt` (never before it started), recording the duration. */
+async function closeOpenSessions(supabase: SupabaseServerClient, taskId: string, endedAt: Date) {
+  const { data: open } = await supabase
+    .from("task_sessions")
+    .select("id, started_at")
+    .eq("task_id", taskId)
+    .is("ended_at", null);
+
+  for (const session of open ?? []) {
+    const start = new Date(session.started_at).getTime();
+    const end = Math.max(endedAt.getTime(), start);
+    const { error } = await supabase
+      .from("task_sessions")
+      .update({ ended_at: new Date(end).toISOString(), duration_seconds: Math.round((end - start) / 1000) })
+      .eq("id", session.id);
+    if (error) throw new Error(error.message);
+  }
+}
+
 export async function toggleTaskComplete(taskId: string, completed: boolean) {
   const { supabase, user } = await requireUser();
 
   await assertTaskEditable(supabase, taskId);
+  const now = new Date();
   if (completed) {
     await assertCanComplete(supabase, taskId);
+    await closeOpenSessions(supabase, taskId, now);
   }
 
   const { error } = await supabase
     .from("tasks")
-    .update({ completed, completed_at: completed ? new Date().toISOString() : null })
+    .update({ completed, completed_at: completed ? now.toISOString() : null })
     .eq("id", taskId)
     .eq("user_id", user.id);
 
@@ -181,21 +203,36 @@ export async function startTimerSession(taskId: string) {
   return data.id as string;
 }
 
+/**
+ * A timer left running past its task's completion or past the end of the task's day
+ * is recorded as ending at whichever came first, not at the moment it's finally stopped.
+ */
 export async function stopTimerSession(sessionId: string) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
 
   const { data: session, error: fetchError } = await supabase
     .from("task_sessions")
-    .select("started_at")
+    .select("started_at, task_id")
     .eq("id", sessionId)
     .single();
 
   if (fetchError || !session) throw new Error(fetchError?.message ?? "Session not found");
 
-  const endedAt = new Date();
-  const durationSeconds = Math.round(
-    (endedAt.getTime() - new Date(session.started_at).getTime()) / 1000,
-  );
+  const [{ data: task }, { data: profile }] = await Promise.all([
+    supabase.from("tasks").select("scheduled_date, completed_at").eq("id", session.task_id).single(),
+    supabase.from("profiles").select("timezone").eq("id", user.id).single(),
+  ]);
+
+  const startedAt = new Date(session.started_at).getTime();
+  const candidates = [Date.now()];
+  if (task) {
+    candidates.push(endOfDayInTimezone(task.scheduled_date, profile?.timezone ?? "UTC").getTime());
+    const completedAt = task.completed_at ? new Date(task.completed_at).getTime() : null;
+    if (completedAt && completedAt > startedAt) candidates.push(completedAt);
+  }
+
+  const endedAt = new Date(Math.max(startedAt, Math.min(...candidates)));
+  const durationSeconds = Math.round((endedAt.getTime() - startedAt) / 1000);
 
   const { error } = await supabase
     .from("task_sessions")
@@ -289,9 +326,11 @@ export async function toggleSubtask(subtaskId: string, completed: boolean) {
     if (total && total === done) {
       try {
         await assertCanComplete(supabase, subtask.task_id);
+        const now = new Date();
+        await closeOpenSessions(supabase, subtask.task_id, now);
         await supabase
           .from("tasks")
-          .update({ completed: true, completed_at: new Date().toISOString() })
+          .update({ completed: true, completed_at: now.toISOString() })
           .eq("id", subtask.task_id);
       } catch {
         // track-time requirement not met yet — leave the task unchecked

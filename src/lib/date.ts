@@ -45,4 +45,31 @@ export function formatRepeatDays(days: number[]): string {
   return `Repeats ${WEEKDAYS.filter((d) => set.has(d.value)).map((d) => d.name).join(", ")}`;
 }
 
+function timezoneOffsetMs(timestamp: number, timezone: string): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+    })
+      .formatToParts(new Date(timestamp))
+      .map((p) => [p.type, Number(p.value)]),
+  );
+  const asUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  return asUtc - Math.floor(timestamp / 1000) * 1000;
+}
+
+/** The instant `dateKey` (yyyy-mm-dd) ends, i.e. the following midnight, in `timezone`. */
+export function endOfDayInTimezone(dateKey: string, timezone: string): Date {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const naiveMidnight = Date.UTC(y, m - 1, d + 1);
+  const guess = naiveMidnight - timezoneOffsetMs(naiveMidnight, timezone);
+  return new Date(naiveMidnight - timezoneOffsetMs(guess, timezone));
+}
+
 export { toDateKey };
