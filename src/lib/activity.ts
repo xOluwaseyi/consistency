@@ -92,6 +92,20 @@ export function summarizeDay(
   return { slices: visible, tracked, untracked };
 }
 
+/** Timer time per task inside the window. */
+export function taskSecondsInWindow(
+  sessions: { task_id: string; started_at: string; ended_at: string | null }[],
+  window: Interval,
+  now: number,
+) {
+  const totals = new Map<string, number>();
+  for (const s of sessions) {
+    const seconds = overlapSeconds(s.started_at, s.ended_at, window, now);
+    if (seconds > 0) totals.set(s.task_id, (totals.get(s.task_id) ?? 0) + seconds);
+  }
+  return totals;
+}
+
 export function toLocalDateInput(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;

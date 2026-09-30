@@ -185,7 +185,7 @@ export async function getTaskSessions(daysBack: number) {
 
   const { data } = await supabase
     .from("task_sessions")
-    .select("started_at, ended_at")
+    .select("task_id, started_at, ended_at")
     .eq("user_id", user.id)
     .or(`started_at.gte.${isoDaysAgo(daysBack)},ended_at.is.null`);
 

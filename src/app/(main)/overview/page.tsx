@@ -54,13 +54,6 @@ export default async function OverviewPage() {
   const completionRate = totalWeekTasks ? Math.round((completedWeekTasks / totalWeekTasks) * 100) : 0;
   const totalWeekSeconds = weekTasks.reduce((sum, t) => sum + (durations.get(t.id) ?? 0), 0);
 
-  const tasksByDate = new Map<string, typeof weekTasks>();
-  for (const task of weekTasks) {
-    const list = tasksByDate.get(task.scheduled_date) ?? [];
-    list.push(task);
-    tasksByDate.set(task.scheduled_date, list);
-  }
-
   return (
     <div className="space-y-5">
       <div>
@@ -74,7 +67,12 @@ export default async function OverviewPage() {
         <StatCard icon={Target} label="Completion" value={`${completionRate}%`} />
       </div>
 
-      <DayBreakdown categories={activityCategories} entries={activityEntries} sessions={taskSessions} />
+      <DayBreakdown
+        categories={activityCategories}
+        entries={activityEntries}
+        sessions={taskSessions}
+        tasks={weekTasks.map(({ id, title, completed, scheduled_date }) => ({ id, title, completed, scheduled_date }))}
+      />
 
       <div className="rounded-2xl border border-border bg-surface p-3.5">
         <div className="mb-2 flex items-center justify-between">
@@ -96,42 +94,6 @@ export default async function OverviewPage() {
       </div>
 
       <ReflectionBox date={today} initialNote={reflection?.note ?? ""} />
-
-      <div className="rounded-2xl border border-border bg-surface p-3.5">
-        <p className="mb-2.5 text-xs font-medium text-muted">This week&rsquo;s tasks</p>
-        <div className="space-y-3">
-          {last7
-            .slice()
-            .reverse()
-            .map((dateKey) => {
-              const dayTasks = tasksByDate.get(dateKey) ?? [];
-              if (dayTasks.length === 0) return null;
-              const date = new Date(`${dateKey}T00:00:00`);
-              return (
-                <div key={dateKey}>
-                  <p className="mb-1 text-[11px] font-medium text-muted">
-                    {date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
-                  </p>
-                  <ul className="space-y-1">
-                    {dayTasks.map((task) => (
-                      <li key={task.id} className="flex items-center gap-2 text-xs">
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${task.completed ? "bg-success" : "bg-border"}`}
-                        />
-                        <span className={task.completed ? "text-muted line-through" : ""}>
-                          {task.title}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-          {weekTasks.length === 0 && (
-            <p className="text-xs text-muted">No tasks logged this week yet.</p>
-          )}
-        </div>
-      </div>
 
       {distractions.length > 0 && (
         <div className="rounded-2xl border border-border bg-surface p-3.5">

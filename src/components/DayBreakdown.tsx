@@ -3,12 +3,38 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { localDayWindow, summarizeDay, UNTRACKED_COLOR } from "@/lib/activity";
+import {
+  localDayWindow,
+  summarizeDay,
+  taskSecondsInWindow,
+  toLocalDateInput,
+  TASKS_COLOR,
+  UNTRACKED_COLOR,
+} from "@/lib/activity";
 import { useNow } from "@/lib/use-now";
-import { formatDuration } from "@/lib/utils";
+import { cn, formatDuration } from "@/lib/utils";
 import type { ActivityCategory, ActivityEntry } from "@/lib/database.types";
 
 const DAYS_BACK = 6;
+
+type DayTask = { id: string; title: string; completed: boolean; scheduled_date: string };
+
+function TaskList({ tasks }: { tasks: (DayTask & { seconds: number })[] }) {
+  return (
+    <ul className="mt-1.5 space-y-1 border-l border-border pl-3 ml-1">
+      {tasks.map((task) => (
+        <li key={task.id} className="flex items-center gap-2 text-xs">
+          <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", task.completed ? "bg-success" : "bg-border")} />
+          <span className={cn("min-w-0 flex-1 truncate", task.completed && "text-muted line-through")}>
+            {task.title}
+          </span>
+          <span className="text-muted tabular-nums">{formatDuration(task.seconds)}</span>
+          <span className="w-9" />
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function dayLabel(offset: number, windowStart: number) {
   if (offset === 0) return "Today";
@@ -24,10 +50,12 @@ export function DayBreakdown({
   categories,
   entries,
   sessions,
+  tasks,
 }: {
   categories: ActivityCategory[];
   entries: ActivityEntry[];
-  sessions: { started_at: string; ended_at: string | null }[];
+  sessions: { task_id: string; started_at: string; ended_at: string | null }[];
+  tasks: DayTask[];
 }) {
   const now = useNow(60_000);
   const [offset, setOffset] = useState(0);
@@ -50,6 +78,15 @@ export function DayBreakdown({
     ...slices,
     ...(untracked > 0 ? [{ key: "untracked", name: "Untracked", color: UNTRACKED_COLOR, seconds: untracked }] : []),
   ];
+
+  // The day's own tasks (timed or not), plus any other task timed during this day.
+  const dayKey = toLocalDateInput(new Date(dayWindow.start));
+  const taskSeconds = taskSecondsInWindow(sessions, dayWindow, now);
+  const dayTasks = tasks
+    .filter((t) => t.scheduled_date === dayKey || taskSeconds.has(t.id))
+    .map((t) => ({ ...t, seconds: taskSeconds.get(t.id) ?? 0 }))
+    .sort((a, b) => b.seconds - a.seconds || a.title.localeCompare(b.title));
+  const tasksInLegend = tracked > 0 && rows.some((r) => r.key === "tasks");
 
   return (
     <div id="day" className="scroll-mt-24 rounded-2xl border border-border bg-surface p-3.5">
@@ -120,16 +157,29 @@ export function DayBreakdown({
       ) : (
         <ul className="mt-3 space-y-1.5">
           {rows.map((row) => (
-            <li key={row.key} className="flex items-center gap-2 text-xs">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: row.color }} />
-              <span className="min-w-0 flex-1 truncate">{row.name}</span>
-              <span className="text-muted tabular-nums">{formatDuration(row.seconds)}</span>
-              <span className="w-9 text-right text-muted tabular-nums">
-                {windowSeconds ? Math.round((row.seconds / windowSeconds) * 100) : 0}%
-              </span>
+            <li key={row.key}>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: row.color }} />
+                <span className="min-w-0 flex-1 truncate">{row.name}</span>
+                <span className="text-muted tabular-nums">{formatDuration(row.seconds)}</span>
+                <span className="w-9 text-right text-muted tabular-nums">
+                  {windowSeconds ? Math.round((row.seconds / windowSeconds) * 100) : 0}%
+                </span>
+              </div>
+              {row.key === "tasks" && dayTasks.length > 0 && <TaskList tasks={dayTasks} />}
             </li>
           ))}
         </ul>
+      )}
+
+      {!tasksInLegend && dayTasks.length > 0 && (
+        <div className="mt-3">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: TASKS_COLOR }} />
+            <span className="flex-1">Tasks</span>
+          </div>
+          <TaskList tasks={dayTasks} />
+        </div>
       )}
     </div>
   );
